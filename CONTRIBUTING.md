@@ -44,6 +44,7 @@ The individual targets are listed below; `make help` prints the same list.
 | `make rust-fmt` | Fails if any Rust source is not formatted. |
 | `make rust-lint` | Runs clippy, the Rust linter, and treats every warning as an error. |
 | `make rust-test` | Runs the Rust tests. |
+| `make rust-deny` | Checks dependencies for security advisories, disallowed licences, banned crates and unknown sources (needs `cargo-deny`, installed with `cargo install cargo-deny`). |
 | `make rust-doc` | Builds the Rust documentation and treats every warning as an error. |
 | `make lean-check` | A fast text search for Lean constructs that skip or bypass proof checking: `sorry`, `admit`, `native_decide`, new `axiom` declarations and similar. |
 | `make lean-build` | Builds the Lean checker, treating warnings as errors. |

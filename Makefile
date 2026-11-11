@@ -1,4 +1,4 @@
-.PHONY: help hooks-install check fmt rust-fmt rust-lint rust-test rust-doc lean-build lean-check lean-cache lean-audit
+.PHONY: rust-deny help hooks-install check fmt rust-fmt rust-lint rust-test rust-doc lean-build lean-check lean-cache lean-audit
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | sed 's/:.*## /\t/'
@@ -20,6 +20,9 @@ rust-lint: ## Clippy with warnings as errors
 
 rust-test: ## Run Rust tests
 	cargo test --workspace --locked
+
+rust-deny: ## Check advisories, licences, bans and sources with cargo-deny (requires cargo-deny)
+	cargo deny check
 
 rust-doc: ## Build docs with warnings as errors
 	RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked
