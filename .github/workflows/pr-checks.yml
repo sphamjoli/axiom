@@ -35,6 +35,8 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
+          # Full history so a pull request's individual commits can be scanned.
+          fetch-depth: 0
 
       - name: Install Gitleaks
         run: |
@@ -48,18 +50,20 @@ jobs:
 
       - name: Scan for secrets
         id: scan
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set +e
-          # `gitleaks dir` walks the raw filesystem and ignores .gitignore;
-          # .gitleaks.toml's [allowlist] excludes build output such as target/
-          # and node_modules/ for local runs in a dirty working tree.
-          gitleaks dir . \
-            --config .gitleaks.toml \
-            --redact \
-            --no-banner \
-            --report-format json \
-            --report-path gitleaks-report.json \
-            --log-level warn
+          common=(--config .gitleaks.toml --redact --no-banner --report-format json --report-path gitleaks-report.json --log-level warn)
+          if [ -n "$BASE_SHA" ]; then
+            # Every commit in the pull request, so a secret added in one commit
+            # and deleted in a later one is still reported.
+            gitleaks git . --log-opts="${BASE_SHA}..${HEAD_SHA}" "${common[@]}"
+          else
+            # Pushes to main scan the full history.
+            gitleaks git . "${common[@]}"
+          fi
           SCAN_EXIT=$?
           set -e
 
