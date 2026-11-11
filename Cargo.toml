@@ -1,5 +1,4 @@
-# Dependency direction as crates are added: axiom-core is depended on by the
-# analysis and certificate crates, and nothing in axiom-core depends on them.
+# axiom-core must not depend on any other workspace crate.
 [workspace]
 resolver = "3"
 members = ["crates/axiom-core"]
@@ -11,10 +10,11 @@ rust-version = "1.97"
 publish = false
 
 [workspace.dependencies]
-num-bigint = "0.4.6"
+num-bigint = { version = "0.4.6" }
 num-rational = { version = "0.4.2", default-features = false, features = ["num-bigint-std", "std"] }
-num-traits = "0.2.19"
-proptest = "1.12.0"
+num-traits = { version = "0.2.19" }
+proptest = { version = "1.12.0", default-features = false, features = ["std"] }
+thiserror = { version = "2.0.17" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
