@@ -28,8 +28,8 @@ impl TwoStateChain {
     #[must_use]
     pub fn rows(&self) -> [TransitionRow; 2] {
         [
-            Self::row(self.leave_first.complement(), self.leave_first.clone()),
-            Self::row(self.leave_second.clone(), self.leave_second.complement()),
+            TransitionRow::two_state(self.leave_first.clone()),
+            TransitionRow::two_state(self.leave_second.complement()),
         ]
     }
 
@@ -37,13 +37,7 @@ impl TwoStateChain {
     /// `d' = (1 - b) d + a (1 - d) = (1 - a - b) d + a`.
     #[must_use]
     pub fn second_state_update(&self) -> AffineUpdate {
-        let a = self.leave_first.value();
-        let b = self.leave_second.value();
-        AffineUpdate::new(self.leave_first.complement().value() - b, a.clone())
-    }
-
-    fn row(to_first: Probability, to_second: Probability) -> TransitionRow {
-        TransitionRow::try_new(vec![to_first, to_second])
-            .expect("p and 1 - p are probabilities that sum to exactly one")
+        let factor = self.leave_first.complement().value() - self.leave_second.value();
+        AffineUpdate::new(factor, self.leave_first.value().clone())
     }
 }
