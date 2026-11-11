@@ -1,0 +1,71 @@
+# Install with `make hooks-install` (bun install, then lefthook install).
+#
+# Fail policy: a hook wrapper whose tool or runtime (bun/node, ruby, python3,
+# actionlint) is missing warns and exits 0, so commits from Git GUIs with a
+# minimal PATH are never blocked. CI runs every gate with its tools present and
+# is the backstop that fails closed.
+
+pre-commit:
+  parallel: true
+  jobs:
+    - name: rustfmt
+      glob: "*.rs"
+      # Verify-only; run `make fmt` to fix.
+      run: cargo fmt --all -- --check
+    - name: lean forbidden constructs
+      glob: "*.lean"
+      # Fast textual pre-check; the kernel axiom audit runs on pre-push.
+      run: ./scripts/checkLean.sh {staged_files}
+    - name: decorative separators
+      glob: "*.{rs,lean,mjs,sh}"
+      # Blocks newly introduced banner or divider comments. Diff-scoped
+      # (--staged), so only lines this commit adds can fail.
+      run: ./scripts/checkDecorativeSeparators.sh --staged {staged_files}
+    - name: trailing comments
+      glob: "*.{rs,lean,mjs}"
+      # Blocks a line comment trailing code on the same line; a comment belongs
+      # on its own line above the code it explains.
+      run: ./scripts/checkTrailingComments.sh --staged {staged_files}
+    - name: markdown wrap
+      glob: "*.md"
+      # Blocks Markdown paragraphs hard-wrapped across lines; one line per
+      # paragraph keeps diffs reviewable.
+      run: ./scripts/checkMarkdownWrap.sh --staged {staged_files}
+    - name: yaml validation
+      glob: "*.{yml,yaml}"
+      run: ./scripts/checkYaml.sh {staged_files}
+    - name: toml validation
+      glob: "*.toml"
+      run: ./scripts/checkToml.sh {staged_files}
+    - name: shell validation
+      glob: "*.{sh,bash}"
+      run: ./scripts/checkShell.sh {staged_files}
+    - name: github actions
+      glob: ".github/workflows/*.{yml,yaml}"
+      run: ./scripts/checkActions.sh {staged_files}
+    - name: local planning leak guard
+      # Refuses to commit anything under .local/ or a top-level planning file,
+      # even if someone force-adds it past .gitignore.
+      run: |
+        if git diff --cached --name-only | grep -E '^(\.local/|TASKS\.md$|TODO\.md$|NOTES\.md$|PLAN\.md$|plans/|notes/)'; then
+          echo "Local planning files are staged; unstage them." >&2
+          exit 1
+        fi
+
+commit-msg:
+  jobs:
+    - name: conventional commit message
+      # Same checker as the PR title check in pr-checks.yml.
+      run: ./scripts/checkCommitMsg.sh {1}
+
+pre-push:
+  parallel: true
+  jobs:
+    - name: clippy
+      run: cargo clippy --workspace --all-targets --locked -- -D warnings
+    - name: tests
+      run: cargo test --workspace --locked
+    - name: lean forbidden constructs
+      run: ./scripts/checkLean.sh
+    - name: lean axiom audit
+      run: ./scripts/checkLeanAxioms.sh
