@@ -1,0 +1,33 @@
+# Rust build output
+/target/
+
+# Lean build output and fetched dependencies
+/lean/.lake/
+
+# Gate script dependencies
+node_modules/
+
+# Local planning, notes, agent working files and reference material.
+# Never committed: the repository holds the artifact, not the planning around it.
+/.local/
+/TASKS.md
+/TODO.md
+/NOTES.md
+/PLAN.md
+/plans/
+/notes/
+*.epub
+*.pdf
+
+# Claude Code and editor local state
+/.claude/settings.local.json
+/CLAUDE.local.md
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.sw?
+
+# Secrets
+.env
+.env.*
