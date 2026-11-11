@@ -29,7 +29,8 @@ fi
 
 [ "${#files[@]}" -eq 0 ] && exit 0
 
-# Blanks `--` line comments, nested `/- -/` blocks, and string literals, then
+# Blanks `--` line comments, nested `/- -/` blocks, string and character
+# literals and raw strings (`r#"..."#`), then
 # prints `file:line: text` for each remaining line that names a forbidden word.
 # `axiom` is matched only as a declaration keyword, after any attributes and
 # modifiers. Single quotes keep the perl variables away from bash.
@@ -55,6 +56,15 @@ strip_and_match='
     if ($pair eq "/-") { $depth = 1; $i++; next; }
     if ($pair eq "--") { $i++ while $i + 1 < length && substr($_, $i + 1, 1) ne "\n"; next; }
     if ($c eq "\"") { $in_string = 1; next; }
+    if ($c eq "\x27" && substr($_, $i) =~ /^\x27(?:\\.[^\x27\n]{0,8}|[^\\\x27\n])\x27/) { $i += length($&) - 1; next; }
+    if ($c eq "r" && ($i == 0 || substr($_, $i - 1, 1) !~ /[\w\x27.]/) && substr($_, $i) =~ /^r(#*)"/) {
+      my $close = "\"" . $1;
+      my $end = index($_, $close, $i + length($&));
+      my $stop = $end < 0 ? length($_) : $end + length($close);
+      $out .= "\n" x (substr($_, $i, $stop - $i) =~ tr/\n//);
+      $i = $stop - 1;
+      next;
+    }
     $out .= $c;
   }
   my $line_number = 0;
