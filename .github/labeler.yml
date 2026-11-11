@@ -1,7 +1,7 @@
 "component: engine":
   - changed-files:
     - any-glob-to-any-file:
-      - "src/**"
+      - "crates/**"
       - "Cargo.toml"
       - "Cargo.lock"
 
