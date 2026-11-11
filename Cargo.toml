@@ -1,12 +1,24 @@
-[package]
-name = "axiom"
+# Dependency direction as crates are added: axiom-core is depended on by the
+# analysis and certificate crates, and nothing in axiom-core depends on them.
+[workspace]
+resolver = "3"
+members = ["crates/axiom-core"]
+
+[workspace.package]
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.97"
+publish = false
 
-[dependencies]
+[workspace.dependencies]
+num-bigint = "0.4.6"
+num-rational = { version = "0.4.2", default-features = false, features = ["num-bigint-std", "std"] }
+num-traits = "0.2.19"
+proptest = "1.12.0"
 
-[lints.rust]
+[workspace.lints.rust]
 unsafe_code = "forbid"
+missing_docs = "deny"
 
-[lints.clippy]
+[workspace.lints.clippy]
 pedantic = { level = "warn", priority = -1 }
