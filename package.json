@@ -1,0 +1,17 @@
+{
+  "name": "axiom-tooling",
+  "private": true,
+  "description": "Git hook gate scripts only; the project itself is Rust and Lean.",
+  "type": "module",
+  "scripts": {
+    "check:separators": "./scripts/checkDecorativeSeparators.sh",
+    "check:comments": "./scripts/checkTrailingComments.sh",
+    "check:markdown-wrap": "./scripts/checkMarkdownWrap.sh",
+    "check:commit-msg": "./scripts/checkCommitMsg.sh",
+    "check:lean": "./scripts/checkLean.sh"
+  },
+  "devDependencies": {
+    "lefthook": "^1.11.0",
+    "typescript": "^5.8.0"
+  }
+}
