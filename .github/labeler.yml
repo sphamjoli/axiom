@@ -1,0 +1,28 @@
+"component: engine":
+  - changed-files:
+    - any-glob-to-any-file:
+      - "src/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+
+"component: checker":
+  - changed-files:
+    - any-glob-to-any-file: "lean/**"
+
+"component: docs":
+  - changed-files:
+    - any-glob-to-any-file:
+      - "**/*.md"
+      - "docs/**"
+
+"infra":
+  - changed-files:
+    - any-glob-to-any-file:
+      - ".github/**"
+      - ".gitleaks.toml"
+      - "lefthook.yml"
+      - "Makefile"
+      - "scripts/**"
+      - "rust-toolchain.toml"
+      - "lean/lean-toolchain"
+      - "lean/lakefile.toml"

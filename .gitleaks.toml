@@ -1,0 +1,18 @@
+# Gitleaks configuration for axiom.
+#
+# Extends the upstream default ruleset. Add an [allowlist] entry here if a
+# future false positive needs one.
+
+title = "axiom gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Local build output and local-only planning, never committed but present on a dirty working tree; gitleaks dir walks the raw filesystem and does not honor .gitignore"
+paths = [
+  '''(^|/)target/''',
+  '''(^|/)node_modules/''',
+  '''(^|/)\.lake/''',
+  '''(^|/)\.local/''',
+]
