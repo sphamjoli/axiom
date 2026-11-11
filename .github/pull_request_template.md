@@ -26,8 +26,8 @@
 
 ## Checklist
 
-- [ ] Title follows `type(scope): description` (e.g. `feat(cert): emit factorisation certificates`)
-- [ ] `make check` passes locally
+- [ ] Title follows `type(scope): description` (e.g. `feat(cert): emit contraction certificates`)
+- [ ] `make check` passes locally (see `CONTRIBUTING.md`)
 - [ ] Every new claim kind the engine emits has a Lean checker and an adversarial certificate that the checker rejects
 - [ ] No `sorry`, `admit`, new `axiom`, or `native_decide` in `lean/`
 - [ ] Trusted computing base changes (if any) are stated and labelled `tcb`

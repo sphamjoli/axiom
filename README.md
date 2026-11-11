@@ -119,30 +119,6 @@ Results will be reported for correctness, verification coverage (the proportion 
 
 A proven claim establishes that a conclusion follows from the formal semantics of the supplied model. It does not establish that a real system behaves like that model. An estimated claim inherits the assumptions of its sampling procedure, notably independence between runs. The guarantees also depend on the faithfulness of the formal semantics and of the parser, both of which are trusted.
 
-## Repository layout
+## Contributing
 
-| Path | Contents |
-| --- | --- |
-| `Cargo.toml`, `src/` | Rust engine (placeholder crate; to become a workspace) |
-| `lean/` | Lean 4 Lake project for the `AxiomCheck` checker, pinned to Lean v4.19.0 and mathlib |
-| `docs/` | Excalidraw diagrams (`.excalidraw` sources and rendered `.svg`) |
-| `scripts/` | Git hook checks, including `checkLean.sh`, which rejects `sorry`, `admit`, new axioms and `native_decide` (Lean constructs that skip or bypass proof checking) |
-| `.github/` | CI (rustfmt, clippy, tests, rustdoc, Lean build), secret scanning, PR title and label automation |
-
-## Development
-
-Prerequisites are rustup, elan (the Lean version manager) and bun (a JavaScript runtime used by the hook scripts). The Rust toolchain is pinned in `rust-toolchain.toml` and the Lean toolchain in `lean/lean-toolchain`.
-
-```bash
-make hooks-install
-```
-
-```bash
-make lean-cache
-```
-
-```bash
-make check
-```
-
-Commit messages and pull request titles follow `type(scope): subject`, with scopes `core`, `infer`, `circuit`, `cert`, `cli`, `lean`, `examples`, `docs`, `ci` and `deps`.
+Instructions for building, testing and running the project, and the rules for commits and pull requests, are in [CONTRIBUTING.md](CONTRIBUTING.md).
