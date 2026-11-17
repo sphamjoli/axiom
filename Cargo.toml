@@ -1,7 +1,8 @@
-# axiom-core must not depend on any other workspace crate.
+# axiom-core must not depend on any other workspace crate; axiom-cert may depend
+# only on axiom-core.
 [workspace]
 resolver = "3"
-members = ["crates/axiom-core"]
+members = ["crates/axiom-core", "crates/axiom-cert"]
 
 [workspace.package]
 version = "0.1.0"
@@ -10,9 +11,12 @@ rust-version = "1.97"
 publish = false
 
 [workspace.dependencies]
+axiom-core = { path = "crates/axiom-core" }
 num-bigint = { version = "0.4.6" }
 num-rational = { version = "0.4.2", default-features = false, features = ["num-bigint-std", "std"] }
 num-traits = { version = "0.2.19" }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = { version = "1.0.154" }
 proptest = { version = "1.12.0", default-features = false, features = ["std"] }
 thiserror = { version = "2.0.17" }
 
