@@ -56,8 +56,9 @@ On some recent macOS versions the mathlib cache tool fails to start. `make lean-
 
 | Path | Contents |
 | --- | --- |
-| `Cargo.toml`, `crates/` | The Rust engine, a Cargo workspace. `crates/axiom-core` holds exact probabilities, transition rows, two-state chains and affine updates; each crate keeps its tests in its own `tests/` folder. |
+| `Cargo.toml`, `crates/` | The Rust engine, a Cargo workspace. `crates/axiom-core` holds exact probabilities, transition rows, two-state chains and affine updates. `crates/axiom-cert` writes and reads certificates in the version 1 format. Each crate keeps its tests in its own `tests/` folder. |
 | `lean/` | The Lean 4 project for the `AxiomCheck` checker, pinned to Lean v4.19.0 and mathlib v4.19.0. `lean/scripts/AxiomAudit.lean` implements the axiom audit. |
+| `docs/adr/` | Architecture decision records: one file per significant design decision, with the options considered and the consequences. |
 | `docs/` | Diagrams drawn in Excalidraw: each has an editable `.excalidraw` source and a rendered `.svg`. Diagrams are always drawn in Excalidraw, never Mermaid. |
 | `scripts/` | The checks run by the Git hooks and by CI. |
 | `.github/` | CI workflows, the pull request template, issue templates and label definitions. |
