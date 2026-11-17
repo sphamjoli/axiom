@@ -1,15 +1,15 @@
-use axiom_core::{Probability, TransitionRow};
+use axiom_core::{Probability, TransitionMatrix, TransitionRow};
 
 use crate::CertificateError;
 use crate::document::{CertificateDocument, ClaimDocument, FORMAT, ModelDocument, VERSION};
 use crate::fraction_text::FractionText;
 
-/// The largest certificate text, in bytes, that [`Certificate::from_json`]
+/// The largest certificate, in UTF-8 bytes, that [`Certificate::from_json`]
 /// accepts.
 pub const MAX_CERTIFICATE_BYTES: usize = 1024 * 1024;
 
 /// A claim about the embedded model.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Claim {
     /// Every entry of row `row` is a probability and the entries sum to
@@ -20,32 +20,28 @@ pub enum Claim {
     },
 }
 
-/// A validated certificate: a model's transition matrix and claims whose row
-/// references are all in range.
+/// A validated certificate: a square transition matrix and a non-empty list
+/// of distinct claims whose row references are all in range.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Certificate {
-    rows: Vec<TransitionRow>,
+    matrix: TransitionMatrix,
     claims: Vec<Claim>,
 }
 
 impl Certificate {
     /// A certificate with one [`Claim::Mass`] for each row, in row order.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`CertificateError::EmptyModel`] when `rows` is empty.
-    pub fn mass(rows: Vec<TransitionRow>) -> Result<Self, CertificateError> {
-        if rows.is_empty() {
-            return Err(CertificateError::EmptyModel);
-        }
-        let claims = (0..rows.len()).map(|row| Claim::Mass { row }).collect();
-        Ok(Self { rows, claims })
+    #[must_use]
+    pub fn mass(matrix: TransitionMatrix) -> Self {
+        let claims = (0..matrix.states())
+            .map(|row| Claim::Mass { row })
+            .collect();
+        Self { matrix, claims }
     }
 
-    /// The model's transition matrix, one row per current state.
+    /// The model's transition matrix.
     #[must_use]
-    pub fn rows(&self) -> &[TransitionRow] {
-        &self.rows
+    pub fn matrix(&self) -> &TransitionMatrix {
+        &self.matrix
     }
 
     /// The claims, in the order they appear in the certificate.
@@ -59,15 +55,18 @@ impl Certificate {
     ///
     /// # Errors
     ///
-    /// Returns [`CertificateError::Json`] if serialisation fails.
+    /// Returns [`CertificateError::Json`] if `serde_json` reports a failure.
+    /// The document holds only strings, integers and lists, which `serde_json`
+    /// always serialises, so the error is returned instead of panicking on an
+    /// outcome that does not occur.
     pub fn to_json(&self) -> Result<String, CertificateError> {
         let document = CertificateDocument {
             format: FORMAT.to_owned(),
             version: VERSION,
             model: ModelDocument {
-                rows: self.rows.iter().map(row_text).collect(),
+                rows: self.matrix.rows().iter().map(row_text).collect(),
             },
-            claims: self.claims.iter().copied().map(claim_document).collect(),
+            claims: self.claims.iter().map(claim_document).collect(),
         };
         let mut text = serde_json::to_string_pretty(&document)?;
         text.push('\n');
@@ -76,13 +75,17 @@ impl Certificate {
 
     /// Reads and validates a version 1 certificate.
     ///
+    /// Whitespace and the order of keys within an object do not matter; every
+    /// value must be in its canonical form.
+    ///
     /// # Errors
     ///
     /// Returns an error for text larger than [`MAX_CERTIFICATE_BYTES`],
-    /// malformed JSON or unknown fields, a wrong `format` or `version`, a
-    /// non-canonical fraction, an entry that is not a probability, a row that
-    /// does not sum to one, an empty model, or a claim that refers to a
-    /// missing row.
+    /// malformed JSON, unknown or repeated fields, a wrong `format` or
+    /// `version`, a non-canonical fraction, an entry that is not a
+    /// probability, a row that does not sum to one, rows that do not form a
+    /// square matrix, no claims, a repeated claim, or a claim about a missing
+    /// row.
     pub fn from_json(text: &str) -> Result<Self, CertificateError> {
         if text.len() > MAX_CERTIFICATE_BYTES {
             return Err(CertificateError::TooLarge {
@@ -104,16 +107,9 @@ impl Certificate {
             .enumerate()
             .map(|(row, entries)| parse_row(row, entries))
             .collect::<Result<Vec<_>, _>>()?;
-        if rows.is_empty() {
-            return Err(CertificateError::EmptyModel);
-        }
-        let claims = document
-            .claims
-            .iter()
-            .enumerate()
-            .map(|(claim, document)| parse_claim(claim, document, rows.len()))
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(Self { rows, claims })
+        let matrix = TransitionMatrix::try_new(rows)?;
+        let claims = parse_claims(&document.claims, matrix.states())?;
+        Ok(Self { matrix, claims })
     }
 }
 
@@ -124,9 +120,9 @@ fn row_text(row: &TransitionRow) -> Vec<FractionText> {
         .collect()
 }
 
-fn claim_document(claim: Claim) -> ClaimDocument {
+fn claim_document(claim: &Claim) -> ClaimDocument {
     match claim {
-        Claim::Mass { row } => ClaimDocument::Mass { row },
+        Claim::Mass { row } => ClaimDocument::Mass { row: *row },
     }
 }
 
@@ -143,13 +139,29 @@ fn parse_row(row: usize, entries: &[FractionText]) -> Result<TransitionRow, Cert
         .map_err(|source| CertificateError::TransitionRow { row, source })
 }
 
-fn parse_claim(
-    claim: usize,
-    document: &ClaimDocument,
-    rows: usize,
-) -> Result<Claim, CertificateError> {
-    match *document {
-        ClaimDocument::Mass { row } if row < rows => Ok(Claim::Mass { row }),
-        ClaimDocument::Mass { row } => Err(CertificateError::RowOutOfRange { claim, row, rows }),
+fn parse_claims(documents: &[ClaimDocument], rows: usize) -> Result<Vec<Claim>, CertificateError> {
+    if documents.is_empty() {
+        return Err(CertificateError::NoClaims);
     }
+    let mut claims: Vec<Claim> = Vec::with_capacity(documents.len());
+    for (index, document) in documents.iter().enumerate() {
+        let claim = match *document {
+            ClaimDocument::Mass { row } if row < rows => Claim::Mass { row },
+            ClaimDocument::Mass { row } => {
+                return Err(CertificateError::RowOutOfRange {
+                    claim: index,
+                    row,
+                    rows,
+                });
+            }
+        };
+        if let Some(first) = claims.iter().position(|earlier| *earlier == claim) {
+            return Err(CertificateError::DuplicateClaim {
+                claim: index,
+                first,
+            });
+        }
+        claims.push(claim);
+    }
+    Ok(claims)
 }
