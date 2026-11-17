@@ -12,7 +12,7 @@ The engine (Rust, untrusted) and the checker (Lean, trusted) communicate through
 
 - The checker must be able to rebuild everything it needs from the certificate alone, so that Bob does not need Alice's other files.
 - Probabilities must be exact: one tenth must be `1/10`, never the nearest binary floating-point number.
-- Each value must have exactly one valid encoding, so that two engines that agree on a claim produce identical certificates and a checker cannot be confused by alternative spellings of the same number.
+- Each number must have exactly one valid spelling, so that a checker cannot be confused by alternative spellings of the same value, and the engine's output must be canonical, so that two engines that agree on a claim produce identical files.
 - Parsing in Lean must be simple, because the parser belongs to the trusted computing base.
 - Unknown or malformed input must be rejected, not silently ignored.
 - The format must be readable by a person reviewing a rejection.
@@ -26,7 +26,7 @@ The engine (Rust, untrusted) and the checker (Lean, trusted) communicate through
 
 ## Decision
 
-Option 1. A certificate is a JSON object with exactly these fields, and any other field is rejected:
+Option 1. A certificate is a JSON object with exactly these fields; any other field, and any field that appears twice in one object, is rejected:
 
 ```json
 {
@@ -46,10 +46,10 @@ Option 1. A certificate is a JSON object with exactly these fields, and any othe
 ```
 
 - `format` is the constant string `axiom-certificate`, so that an unrelated JSON file is rejected immediately.
-- `version` is an integer. Version 1 is defined here. A checker rejects any version it does not implement.
-- `model.rows` is the transition matrix: one row per current state, one entry per next state, in state order. The model is embedded so that the checker rebuilds the transition matrix itself.
-- Every fraction is an object with exactly two string fields. `num` is a non-negative integer in decimal and `den` is a positive integer in decimal, with no sign, no leading zeros (zero is written `0`), no whitespace, and at most 256 digits each. The fraction must be in lowest terms, so zero is `{"num": "0", "den": "1"}` and one half is never `2/4`.
-- `claims` is a list. Each claim has a `kind` and the witness fields for that kind.
+- `version` is a JSON integer with no fraction or exponent. Version 1 is defined here. A checker rejects any version it does not implement.
+- `model.rows` is the transition matrix: one row per current state, one entry per next state, in state order. There is at least one row, and every row has as many entries as there are rows, so the matrix is square. The model is embedded so that the checker rebuilds the transition matrix itself.
+- Every fraction is an object with exactly two string fields. `num` is a non-negative integer in decimal and `den` is a positive integer in decimal, with no sign, no leading zeros (zero is written `0`), no whitespace, and at most 256 digits each. The fraction must be in lowest terms, meaning that the greatest common divisor of `num` and `den` is 1, so zero is `{"num": "0", "den": "1"}` and one half is never `2/4`.
+- `claims` is a non-empty list of distinct claims, so a certificate always asserts something and never asserts the same thing twice. Each claim has a `kind` and the witness fields for that kind.
 
 The certainty of a claim follows from its kind: an `Estimate` claim is estimated and every other kind is proven, so no separate certainty field is needed.
 
@@ -69,20 +69,22 @@ Later versions will add the remaining claim kinds with these witness fields, eac
 | `Termination` | `probability`: the least solution, a fraction |
 | `Estimate` | `value`, `samples`, `epsilon`, `delta` |
 
-A certificate whose JSON text exceeds 1 MiB is rejected before parsing, which bounds the memory any reader spends on a single certificate.
+A certificate larger than 1 MiB, measured in UTF-8 bytes, is rejected before parsing, which bounds the memory any reader spends on a single certificate.
+
+Whitespace between tokens and the order of keys within an object carry no meaning: a reader accepts any arrangement, provided every value is canonical. The engine always writes the same arrangement, the one shown above, pretty-printed with two-space indentation and a trailing newline. Requiring canonical input text as well would add a second, byte-level check to the trusted parser without strengthening any claim, because the checker's verdict depends only on the values.
 
 ## Consequences
 
 - The Lean checker needs a JSON parser and a decimal-integer parser in its trusted computing base. Both are small and can be tested against the same golden files as the engine.
 - Rejecting unknown fields means an old checker cannot read a newer certificate. This is intended: a checker that ignored an unknown claim kind could report a certificate as verified while skipping part of it.
-- Canonical encoding means a certificate can be compared byte for byte, and equal claims produce equal files.
+- Canonical output means certificates written by the engine can be compared byte for byte, and equal claims produce equal files. Certificates from other sources are compared by value.
 - The 256-digit and 1 MiB limits exclude models with extremely precise probabilities. They can be raised in a later version if a real model needs it.
 - Fractions as strings are slightly more verbose than JSON numbers. Certificate size is one of the evaluation metrics, so the cost will be measured.
 
 ## Verification
 
 - `crates/axiom-cert` implements version 1. Its tests include a golden file, `crates/axiom-cert/tests/fixtures/links-mass.json`, which the engine must reproduce byte for byte and which the Lean checker will later parse.
-- Rejection tests cover each rule above: wrong format, unsupported version, unknown fields, non-canonical and over-long numbers, a zero denominator, rows that do not sum to one, claims that refer to a missing row, and oversized input.
+- Rejection tests cover each rule above: wrong format, unsupported version, unknown and repeated fields, non-canonical and over-long numbers, a zero denominator, rows that do not sum to one, a matrix that is empty or not square, an empty or repeated claim, claims that refer to a missing row, and oversized input. A further test confirms that whitespace and key order do not change the result.
 
 ## Related decisions
 
