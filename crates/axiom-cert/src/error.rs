@@ -1,4 +1,4 @@
-use axiom_core::{ProbabilityError, TransitionRowError};
+use axiom_core::{ProbabilityError, TransitionMatrixError, TransitionRowError};
 use thiserror::Error;
 
 /// The reason a certificate could not be written or read.
@@ -49,9 +49,21 @@ pub enum CertificateError {
         /// Why the row is not a transition row.
         source: TransitionRowError,
     },
-    /// The model has no rows.
-    #[error("model has no rows")]
-    EmptyModel,
+    /// The rows do not form a transition matrix: there are none, or the
+    /// matrix is not square.
+    #[error(transparent)]
+    TransitionMatrix(#[from] TransitionMatrixError),
+    /// The certificate makes no claims, so there would be nothing to verify.
+    #[error("certificate makes no claims")]
+    NoClaims,
+    /// A claim repeats an earlier claim.
+    #[error("claim {claim} repeats claim {first}")]
+    DuplicateClaim {
+        /// The index of the repeated claim.
+        claim: usize,
+        /// The index of the earlier, identical claim.
+        first: usize,
+    },
     /// A claim refers to a row the model does not have.
     #[error("claim {claim} refers to row {row}, but the model has {rows} rows")]
     RowOutOfRange {
