@@ -11,7 +11,7 @@ rust-version = "1.97"
 publish = false
 
 [workspace.dependencies]
-axiom-core = { path = "crates/axiom-core" }
+axiom-core = { path = "crates/axiom-core", version = "0.1.0" }
 num-bigint = { version = "0.4.6" }
 num-rational = { version = "0.4.2", default-features = false, features = ["num-bigint-std", "std"] }
 num-traits = { version = "0.2.19" }
