@@ -1,6 +1,11 @@
 //! Helpers shared by the integration tests.
 
-use axiom_core::{Probability, ProbabilityError, TransitionRowError};
+#![allow(
+    dead_code,
+    reason = "each test binary compiles this module and uses only some of its items"
+)]
+
+use axiom_core::{Probability, ProbabilityError, TransitionMatrixError, TransitionRowError};
 use num_bigint::BigInt;
 use num_rational::BigRational;
 use thiserror::Error;
@@ -15,11 +20,10 @@ pub enum TestError {
     /// A row used by the test is not a transition row.
     #[error(transparent)]
     TransitionRow(#[from] TransitionRowError),
+    /// A matrix used by the test is not a transition matrix.
+    #[error(transparent)]
+    TransitionMatrix(#[from] TransitionMatrixError),
     /// An iterator ended before the requested term.
-    #[allow(
-        dead_code,
-        reason = "each test binary compiles this shared module; only some use this variant"
-    )]
     #[error("sequence ended before term {0}")]
     MissingTerm(usize),
 }
