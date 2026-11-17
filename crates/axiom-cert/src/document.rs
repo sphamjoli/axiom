@@ -29,5 +29,5 @@ pub(crate) struct ModelDocument {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "kind", deny_unknown_fields)]
 pub(crate) enum ClaimDocument {
-    Mass { row: usize },
+    Mass { row: u64 },
 }

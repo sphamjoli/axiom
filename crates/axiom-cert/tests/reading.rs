@@ -2,7 +2,7 @@
 
 mod common;
 
-use axiom_cert::{Certificate, CertificateError, Claim, MAX_CERTIFICATE_BYTES};
+use axiom_cert::{Certificate, CertificateError, Claim, MAX_CERTIFICATE_BYTES, MAX_STATES};
 use axiom_core::{ProbabilityError, TransitionMatrixError, TransitionRowError};
 use common::{LINKS_MASS, TestError, link_chain};
 
@@ -64,7 +64,7 @@ fn rejects_a_repeated_key() {
         certificate_text(halves(), 0).replace("\"version\":1", "\"version\":1,\"version\":1");
     assert!(matches!(
         Certificate::from_json(&text),
-        Err(CertificateError::Json(_))
+        Err(CertificateError::Json { .. })
     ));
 }
 
@@ -113,7 +113,7 @@ fn rejects_an_unrelated_format() {
     let text = certificate_text(halves(), 0).replace("axiom-certificate", "other");
     assert!(matches!(
         Certificate::from_json(&text),
-        Err(CertificateError::UnsupportedFormat(format)) if format == "other"
+        Err(CertificateError::UnsupportedFormat)
     ));
 }
 
@@ -142,7 +142,7 @@ fn rejects_unknown_fields_at_every_level() {
         assert!(
             matches!(
                 Certificate::from_json(&text),
-                Err(CertificateError::Json(_))
+                Err(CertificateError::Json { .. })
             ),
             "{text}"
         );
@@ -154,13 +154,13 @@ fn rejects_unknown_claim_kinds_and_missing_fields() {
     let unknown = certificate_text(halves(), 0).replace("\"Mass\"", "\"FixedPoint\"");
     assert!(matches!(
         Certificate::from_json(&unknown),
-        Err(CertificateError::Json(_))
+        Err(CertificateError::Json { .. })
     ));
     let missing =
         certificate_text(halves(), 0).replace(r#","claims":[{"kind":"Mass","row":0}]"#, "");
     assert!(matches!(
         Certificate::from_json(&missing),
-        Err(CertificateError::Json(_))
+        Err(CertificateError::Json { .. })
     ));
 }
 
@@ -194,20 +194,20 @@ fn rejects_fractions_written_as_json_numbers() {
     let numbers = r#"{"num":1,"den":2},{"num":1,"den":2}"#;
     assert!(matches!(
         Certificate::from_json(&certificate_text(numbers, 0)),
-        Err(CertificateError::Json(_))
+        Err(CertificateError::Json { .. })
     ));
 }
 
 #[test]
-fn accepts_256_digits_and_rejects_257() -> Result<(), TestError> {
-    let ten_to_255 = format!("1{}", "0".repeat(255));
-    let nines = "9".repeat(255);
+fn accepts_64_digits_and_rejects_65() -> Result<(), TestError> {
+    let ten_to_63 = format!("1{}", "0".repeat(63));
+    let nines = "9".repeat(63);
     let within =
-        format!(r#"{{"num":"{nines}","den":"{ten_to_255}"}},{{"num":"1","den":"{ten_to_255}"}}"#);
+        format!(r#"{{"num":"{nines}","den":"{ten_to_63}"}},{{"num":"1","den":"{ten_to_63}"}}"#);
     let certificate = Certificate::from_json(&certificate_text(&within, 0))?;
     assert_eq!(certificate.matrix().states(), 2);
-    let ten_to_256 = format!("1{}", "0".repeat(256));
-    let beyond = format!(r#"{{"num":"1","den":"{ten_to_256}"}},{{"num":"1","den":"1"}}"#);
+    let ten_to_64 = format!("1{}", "0".repeat(64));
+    let beyond = format!(r#"{{"num":"1","den":"{ten_to_64}"}},{{"num":"1","den":"1"}}"#);
     assert!(matches!(
         Certificate::from_json(&certificate_text(&beyond, 0)),
         Err(CertificateError::NonCanonicalFraction { .. })
@@ -235,15 +235,18 @@ fn rejects_rows_that_do_not_sum_to_one() {
         Certificate::from_json(&certificate_text(entries, 0)),
         Err(CertificateError::TransitionRow {
             row: 0,
-            source: TransitionRowError::NotNormalised { .. }
+            source: TransitionRowError::NotNormalised
         })
     ));
     assert!(matches!(
         Certificate::from_json(&certificate_text("", 0)),
-        Err(CertificateError::TransitionRow {
-            row: 0,
-            source: TransitionRowError::Empty
-        })
+        Err(CertificateError::TransitionMatrix(
+            TransitionMatrixError::NotSquare {
+                row: 0,
+                entries: 0,
+                states: 2
+            }
+        ))
     ));
 }
 
@@ -275,7 +278,7 @@ fn passes_text_of_exactly_the_limit_to_the_parser() {
     let at_limit = " ".repeat(MAX_CERTIFICATE_BYTES);
     assert!(matches!(
         Certificate::from_json(&at_limit),
-        Err(CertificateError::Json(_))
+        Err(CertificateError::Json { .. })
     ));
 }
 
@@ -293,11 +296,11 @@ fn rejects_trailing_data_and_malformed_json() {
     let trailing = format!("{} {{}}", certificate_text(halves(), 0));
     assert!(matches!(
         Certificate::from_json(&trailing),
-        Err(CertificateError::Json(_))
+        Err(CertificateError::Json { .. })
     ));
     assert!(matches!(
         Certificate::from_json("not json"),
-        Err(CertificateError::Json(_))
+        Err(CertificateError::Json { .. })
     ));
 }
 
@@ -322,4 +325,110 @@ fn every_error_names_what_went_wrong() {
         CertificateError::UnsupportedVersion(2).to_string(),
         "unsupported certificate version 2"
     );
+}
+
+/// A certificate whose model has `states` rows, each with `states` entries
+/// of `1/states`.
+fn uniform_certificate(states: usize) -> String {
+    let entry = format!(r#"{{"num":"1","den":"{states}"}}"#);
+    let row = format!("[{}]", vec![entry; states].join(","));
+    let rows = vec![row; states].join(",");
+    format!(
+        r#"{{"format":"axiom-certificate","version":1,"model":{{"rows":[{rows}]}},"claims":[{{"kind":"Mass","row":0}}]}}"#
+    )
+}
+
+#[test]
+fn accepts_the_largest_allowed_model() -> Result<(), TestError> {
+    let certificate = Certificate::from_json(&uniform_certificate(MAX_STATES))?;
+    assert_eq!(certificate.matrix().states(), MAX_STATES);
+    Ok(())
+}
+
+#[test]
+fn rejects_one_state_more_than_the_limit() {
+    assert!(matches!(
+        Certificate::from_json(&uniform_certificate(MAX_STATES + 1)),
+        Err(CertificateError::TooManyStates { states, limit }) if states == MAX_STATES + 1 && limit == MAX_STATES
+    ));
+}
+
+#[test]
+fn rejects_a_long_row_of_large_denominators_before_summing_it() {
+    let entries: Vec<String> = (0..3_800)
+        .map(|offset| format!(r#"{{"num":"1","den":"1{}{offset:04}"}}"#, "0".repeat(245)))
+        .collect();
+    let text = certificate_text(&entries.join(","), 0);
+    assert!(text.len() <= MAX_CERTIFICATE_BYTES);
+    assert!(matches!(
+        Certificate::from_json(&text),
+        Err(CertificateError::TransitionMatrix(
+            TransitionMatrixError::NotSquare {
+                row: 0,
+                entries: 3_800,
+                states: 2
+            }
+        ))
+    ));
+}
+
+#[test]
+fn error_messages_never_echo_certificate_text() {
+    let escape = "\\u001b[31m";
+    let hostile = [
+        certificate_text(
+            &format!(r#"{{"num":"{escape}","den":"2"}},{{"num":"1","den":"2"}}"#),
+            0,
+        ),
+        certificate_text(halves(), 0).replace("axiom-certificate", escape),
+        certificate_text(halves(), 0).replace("\"version\"", &format!("\"{escape}\"")),
+        certificate_text(halves(), 0).replace("\"Mass\"", &format!("\"{escape}\"")),
+    ];
+    for text in hostile {
+        let message = match Certificate::from_json(&text) {
+            Ok(_) => String::new(),
+            Err(error) => error.to_string(),
+        };
+        assert!(!message.is_empty(), "{text}");
+        assert!(
+            !message.contains('\u{1b}') && !message.contains("31m"),
+            "{message}"
+        );
+    }
+}
+
+#[test]
+fn rejects_row_indices_beyond_any_model() {
+    assert!(matches!(
+        Certificate::from_json(&certificate_text(halves(), 1 << 40)),
+        Err(CertificateError::RowOutOfRange { claim: 0, row, rows: 2 }) if row == 1 << 40
+    ));
+}
+
+#[test]
+fn rejects_numbers_written_with_a_fraction_or_exponent() {
+    let variants = [
+        certificate_text(halves(), 0).replace("\"version\":1", "\"version\":1.0"),
+        certificate_text(halves(), 0).replace("\"version\":1", "\"version\":1e0"),
+        certificate_text(halves(), 0).replace("\"row\":0", "\"row\":0.0"),
+        certificate_text(halves(), 0).replace("\"row\":0", "\"row\":-1"),
+    ];
+    for text in variants {
+        assert!(
+            matches!(
+                Certificate::from_json(&text),
+                Err(CertificateError::Json { .. })
+            ),
+            "{text}"
+        );
+    }
+}
+
+#[test]
+fn rejects_a_byte_order_mark() {
+    let text = format!("\u{feff}{}", certificate_text(halves(), 0));
+    assert!(matches!(
+        Certificate::from_json(&text),
+        Err(CertificateError::Json { .. })
+    ));
 }

@@ -1,4 +1,4 @@
-use axiom_core::{Probability, TransitionMatrix, TransitionRow};
+use axiom_core::{Probability, TransitionMatrix, TransitionMatrixError, TransitionRow};
 
 use crate::CertificateError;
 use crate::document::{CertificateDocument, ClaimDocument, FORMAT, ModelDocument, VERSION};
@@ -7,6 +7,12 @@ use crate::fraction_text::FractionText;
 /// The largest certificate, in UTF-8 bytes, that [`Certificate::from_json`]
 /// accepts.
 pub const MAX_CERTIFICATE_BYTES: usize = 1024 * 1024;
+
+/// The largest number of states a certificate's model may have.
+///
+/// With at most this many entries per row, each of at most 64 digits,
+/// checking that a row sums to one takes milliseconds.
+pub const MAX_STATES: usize = 16;
 
 /// A claim about the embedded model.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -76,7 +82,11 @@ impl Certificate {
     /// Reads and validates a version 1 certificate.
     ///
     /// Whitespace and the order of keys within an object do not matter; every
-    /// value must be in its canonical form.
+    /// value must be in its canonical form. The size of the matrix is checked
+    /// before any fraction is parsed or summed, so the work done is bounded by
+    /// [`MAX_STATES`] and the 64-digit limit. Callers reading from a file or
+    /// socket must cap the read at [`MAX_CERTIFICATE_BYTES`] plus one byte
+    /// themselves, since this function only sees text already in memory.
     ///
     /// # Errors
     ///
@@ -95,11 +105,12 @@ impl Certificate {
         }
         let document: CertificateDocument = serde_json::from_str(text)?;
         if document.format != FORMAT {
-            return Err(CertificateError::UnsupportedFormat(document.format));
+            return Err(CertificateError::UnsupportedFormat);
         }
         if document.version != VERSION {
             return Err(CertificateError::UnsupportedVersion(document.version));
         }
+        check_shape(&document.model.rows)?;
         let rows = document
             .model
             .rows
@@ -113,6 +124,27 @@ impl Certificate {
     }
 }
 
+/// Rejects a model with too many states or a ragged shape before any fraction
+/// is parsed, so the cost of summing rows stays bounded.
+fn check_shape(rows: &[Vec<FractionText>]) -> Result<(), CertificateError> {
+    let states = rows.len();
+    if states > MAX_STATES {
+        return Err(CertificateError::TooManyStates {
+            states,
+            limit: MAX_STATES,
+        });
+    }
+    if let Some((row, ragged)) = rows.iter().enumerate().find(|(_, row)| row.len() != states) {
+        return Err(TransitionMatrixError::NotSquare {
+            row,
+            entries: ragged.len(),
+            states,
+        }
+        .into());
+    }
+    Ok(())
+}
+
 fn row_text(row: &TransitionRow) -> Vec<FractionText> {
     row.probabilities()
         .iter()
@@ -122,7 +154,7 @@ fn row_text(row: &TransitionRow) -> Vec<FractionText> {
 
 fn claim_document(claim: &Claim) -> ClaimDocument {
     match claim {
-        Claim::Mass { row } => ClaimDocument::Mass { row: *row },
+        Claim::Mass { row } => ClaimDocument::Mass { row: *row as u64 },
     }
 }
 
@@ -131,7 +163,7 @@ fn parse_row(row: usize, entries: &[FractionText]) -> Result<TransitionRow, Cert
         .iter()
         .enumerate()
         .map(|(entry, text)| {
-            Probability::try_new(&text.to_fraction()?)
+            Probability::try_new(&text.to_fraction(row, entry)?)
                 .map_err(|source| CertificateError::Probability { row, entry, source })
         })
         .collect::<Result<Vec<_>, _>>()?;
@@ -146,14 +178,18 @@ fn parse_claims(documents: &[ClaimDocument], rows: usize) -> Result<Vec<Claim>, 
     let mut claims: Vec<Claim> = Vec::with_capacity(documents.len());
     for (index, document) in documents.iter().enumerate() {
         let claim = match *document {
-            ClaimDocument::Mass { row } if row < rows => Claim::Mass { row },
-            ClaimDocument::Mass { row } => {
-                return Err(CertificateError::RowOutOfRange {
-                    claim: index,
-                    row,
-                    rows,
-                });
-            }
+            ClaimDocument::Mass { row } => match usize::try_from(row) {
+                Ok(index_in_range) if index_in_range < rows => Claim::Mass {
+                    row: index_in_range,
+                },
+                _ => {
+                    return Err(CertificateError::RowOutOfRange {
+                        claim: index,
+                        row,
+                        rows,
+                    });
+                }
+            },
         };
         if let Some(first) = claims.iter().position(|earlier| *earlier == claim) {
             return Err(CertificateError::DuplicateClaim {
