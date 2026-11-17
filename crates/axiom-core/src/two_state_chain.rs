@@ -1,4 +1,4 @@
-use crate::{AffineUpdate, Probability, TransitionRow};
+use crate::{AffineUpdate, Probability, TransitionMatrix, TransitionRow};
 
 /// A chain with two states that moves between them at fixed probabilities.
 ///
@@ -23,14 +23,14 @@ impl TwoStateChain {
         }
     }
 
-    /// The transition matrix rows `[1 - a, a]` and `[b, 1 - b]`, where `a` is
-    /// `leave_first` and `b` is `leave_second`.
+    /// The transition matrix with rows `[1 - a, a]` and `[b, 1 - b]`, where `a`
+    /// is `leave_first` and `b` is `leave_second`.
     #[must_use]
-    pub fn rows(&self) -> [TransitionRow; 2] {
-        [
+    pub fn matrix(&self) -> TransitionMatrix {
+        TransitionMatrix::two_state([
             TransitionRow::two_state(self.leave_first.clone()),
             TransitionRow::two_state(self.leave_second.complement()),
-        ]
+        ])
     }
 
     /// The update for the probability `d` of occupying the second state:
