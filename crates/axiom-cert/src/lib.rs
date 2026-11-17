@@ -12,5 +12,5 @@ mod document;
 mod error;
 mod fraction_text;
 
-pub use certificate::{Certificate, Claim, MAX_CERTIFICATE_BYTES};
+pub use certificate::{Certificate, Claim, MAX_CERTIFICATE_BYTES, MAX_STATES};
 pub use error::CertificateError;
