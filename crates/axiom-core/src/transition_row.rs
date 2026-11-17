@@ -14,22 +14,25 @@ use crate::Probability;
 pub struct TransitionRow(Vec<Probability>);
 
 /// The reason a list of probabilities is not a transition row.
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
 #[non_exhaustive]
 pub enum TransitionRowError {
     /// The row has no entries.
     #[error("transition row has no entries")]
     Empty,
-    /// The entries do not sum to one.
-    #[error("transition row sums to {sum}, not 1")]
-    NotNormalised {
-        /// The exact sum of the entries.
-        sum: BigRational,
-    },
+    /// The entries do not sum to one. The sum itself is not kept: its
+    /// numerator and denominator can be far larger than the entries.
+    #[error("transition row does not sum to 1")]
+    NotNormalised,
 }
 
 impl TransitionRow {
     /// Validates that `probabilities` is non-empty and sums to exactly one.
+    ///
+    /// Summing fractions with unrelated denominators makes the running
+    /// denominator grow towards their least common multiple, so the cost grows
+    /// faster than linearly in the number and size of the entries. Callers that
+    /// accept rows from untrusted input bound both before calling this.
     ///
     /// # Errors
     ///
@@ -45,7 +48,7 @@ impl TransitionRow {
                 total + probability.value()
             });
         if !sum.is_one() {
-            return Err(TransitionRowError::NotNormalised { sum });
+            return Err(TransitionRowError::NotNormalised);
         }
         Ok(Self(probabilities))
     }

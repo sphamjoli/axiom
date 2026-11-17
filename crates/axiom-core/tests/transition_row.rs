@@ -28,14 +28,14 @@ fn rejects_an_empty_row() {
 }
 
 #[test]
-fn rejects_a_row_off_the_simplex_and_reports_the_exact_sum() -> Result<(), TestError> {
+fn rejects_a_row_off_the_simplex() -> Result<(), TestError> {
     assert_eq!(
         TransitionRow::try_new(vec![probability(9, 10)?, probability(2, 10)?]),
-        Err(TransitionRowError::NotNormalised { sum: ratio(11, 10) })
+        Err(TransitionRowError::NotNormalised)
     );
     assert_eq!(
         TransitionRow::try_new(vec![probability(1, 3)?, probability(1, 3)?]),
-        Err(TransitionRowError::NotNormalised { sum: ratio(2, 3) })
+        Err(TransitionRowError::NotNormalised)
     );
     Ok(())
 }
@@ -49,9 +49,7 @@ fn rejects_a_sum_that_floating_point_would_round_to_one() -> Result<(), TestErro
     ];
     assert_eq!(
         TransitionRow::try_new(almost),
-        Err(TransitionRowError::NotNormalised {
-            sum: ratio(2999, 3000)
-        })
+        Err(TransitionRowError::NotNormalised)
     );
     Ok(())
 }
@@ -75,7 +73,7 @@ fn every_error_has_a_distinct_message() {
         "transition row has no entries"
     );
     assert_eq!(
-        TransitionRowError::NotNormalised { sum: ratio(11, 10) }.to_string(),
-        "transition row sums to 11/10, not 1"
+        TransitionRowError::NotNormalised.to_string(),
+        "transition row does not sum to 1"
     );
 }
