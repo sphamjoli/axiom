@@ -3,14 +3,15 @@
 mod common;
 
 use axiom_cert::{Certificate, CertificateError, Claim, MAX_CERTIFICATE_BYTES};
-use axiom_core::{ProbabilityError, TransitionRowError};
+use axiom_core::{ProbabilityError, TransitionMatrixError, TransitionRowError};
 use common::{LINKS_MASS, TestError, link_chain};
 
-/// A one-row certificate whose row has the given entries and whose single
-/// claim refers to `row`.
+/// A two-state certificate whose first row has the given entries, whose
+/// second row is `[1/2, 1/2]`, and whose single claim refers to `row`.
 fn certificate_text(entries: &str, row: usize) -> String {
     format!(
-        r#"{{"format":"axiom-certificate","version":1,"model":{{"rows":[[{entries}]]}},"claims":[{{"kind":"Mass","row":{row}}}]}}"#
+        r#"{{"format":"axiom-certificate","version":1,"model":{{"rows":[[{entries}],[{}]]}},"claims":[{{"kind":"Mass","row":{row}}}]}}"#,
+        halves()
     )
 }
 
@@ -21,7 +22,7 @@ fn halves() -> &'static str {
 #[test]
 fn reads_the_golden_file_as_the_link_model() -> Result<(), TestError> {
     let certificate = Certificate::from_json(LINKS_MASS)?;
-    assert_eq!(certificate.rows(), link_chain()?.rows().as_slice());
+    assert_eq!(certificate.matrix(), &link_chain()?.matrix());
     assert_eq!(
         certificate.claims(),
         &[Claim::Mass { row: 0 }, Claim::Mass { row: 1 }]
@@ -32,18 +33,79 @@ fn reads_the_golden_file_as_the_link_model() -> Result<(), TestError> {
 #[test]
 fn accepts_a_minimal_valid_certificate() -> Result<(), TestError> {
     let certificate = Certificate::from_json(&certificate_text(halves(), 0))?;
-    assert_eq!(certificate.rows().len(), 1);
+    assert_eq!(certificate.matrix().states(), 2);
     Ok(())
 }
 
 #[test]
-fn accepts_a_certificate_with_no_claims() -> Result<(), TestError> {
-    let text = format!(
-        r#"{{"format":"axiom-certificate","version":1,"model":{{"rows":[[{}]]}},"claims":[]}}"#,
-        halves()
+fn rejects_a_certificate_with_no_claims() {
+    let text = certificate_text(halves(), 0).replace(r#"{"kind":"Mass","row":0}"#, "");
+    assert!(matches!(
+        Certificate::from_json(&text),
+        Err(CertificateError::NoClaims)
+    ));
+}
+
+#[test]
+fn rejects_a_repeated_claim() {
+    let text = certificate_text(halves(), 0).replace(
+        r#"{"kind":"Mass","row":0}"#,
+        r#"{"kind":"Mass","row":0},{"kind":"Mass","row":0}"#,
     );
-    assert!(Certificate::from_json(&text)?.claims().is_empty());
+    assert!(matches!(
+        Certificate::from_json(&text),
+        Err(CertificateError::DuplicateClaim { claim: 1, first: 0 })
+    ));
+}
+
+#[test]
+fn rejects_a_repeated_key() {
+    let text =
+        certificate_text(halves(), 0).replace("\"version\":1", "\"version\":1,\"version\":1");
+    assert!(matches!(
+        Certificate::from_json(&text),
+        Err(CertificateError::Json(_))
+    ));
+}
+
+#[test]
+fn ignores_whitespace_and_key_order() -> Result<(), TestError> {
+    let reordered = format!(
+        "{{ \"claims\": [ {{ \"row\": 0, \"kind\": \"Mass\" }} ],\n  \"model\": {{ \"rows\": [ [ {h} ], [ {h} ] ] }}, \"version\": 1, \"format\": \"axiom-certificate\" }}",
+        h = halves()
+    );
+    assert_eq!(
+        Certificate::from_json(&reordered)?,
+        Certificate::from_json(&certificate_text(halves(), 0))?
+    );
     Ok(())
+}
+
+#[test]
+fn accepts_zero_written_as_zero_over_one() -> Result<(), TestError> {
+    let entries = r#"{"num":"0","den":"1"},{"num":"1","den":"1"}"#;
+    assert_eq!(
+        Certificate::from_json(&certificate_text(entries, 0))?
+            .matrix()
+            .states(),
+        2
+    );
+    Ok(())
+}
+
+#[test]
+fn rejects_a_matrix_that_is_not_square() {
+    let text = certificate_text(r#"{"num":"1","den":"1"}"#, 0);
+    assert!(matches!(
+        Certificate::from_json(&text),
+        Err(CertificateError::TransitionMatrix(
+            TransitionMatrixError::NotSquare {
+                row: 0,
+                entries: 1,
+                states: 2
+            }
+        ))
+    ));
 }
 
 #[test]
@@ -143,7 +205,7 @@ fn accepts_256_digits_and_rejects_257() -> Result<(), TestError> {
     let within =
         format!(r#"{{"num":"{nines}","den":"{ten_to_255}"}},{{"num":"1","den":"{ten_to_255}"}}"#);
     let certificate = Certificate::from_json(&certificate_text(&within, 0))?;
-    assert_eq!(certificate.rows().len(), 1);
+    assert_eq!(certificate.matrix().states(), 2);
     let ten_to_256 = format!("1{}", "0".repeat(256));
     let beyond = format!(r#"{{"num":"1","den":"{ten_to_256}"}},{{"num":"1","den":"1"}}"#);
     assert!(matches!(
@@ -187,22 +249,33 @@ fn rejects_rows_that_do_not_sum_to_one() {
 
 #[test]
 fn rejects_an_empty_model() {
-    let text = r#"{"format":"axiom-certificate","version":1,"model":{"rows":[]},"claims":[]}"#;
+    let text = r#"{"format":"axiom-certificate","version":1,"model":{"rows":[]},"claims":[{"kind":"Mass","row":0}]}"#;
     assert!(matches!(
         Certificate::from_json(text),
-        Err(CertificateError::EmptyModel)
+        Err(CertificateError::TransitionMatrix(
+            TransitionMatrixError::Empty
+        ))
     ));
 }
 
 #[test]
 fn rejects_claims_about_missing_rows() {
     assert!(matches!(
-        Certificate::from_json(&certificate_text(halves(), 1)),
+        Certificate::from_json(&certificate_text(halves(), 2)),
         Err(CertificateError::RowOutOfRange {
             claim: 0,
-            row: 1,
-            rows: 1
+            row: 2,
+            rows: 2
         })
+    ));
+}
+
+#[test]
+fn passes_text_of_exactly_the_limit_to_the_parser() {
+    let at_limit = " ".repeat(MAX_CERTIFICATE_BYTES);
+    assert!(matches!(
+        Certificate::from_json(&at_limit),
+        Err(CertificateError::Json(_))
     ));
 }
 
@@ -238,8 +311,12 @@ fn every_error_names_what_went_wrong() {
     .to_string();
     assert_eq!(message, "claim 2 refers to row 5, but the model has 3 rows");
     assert_eq!(
-        CertificateError::EmptyModel.to_string(),
-        "model has no rows"
+        CertificateError::NoClaims.to_string(),
+        "certificate makes no claims"
+    );
+    assert_eq!(
+        CertificateError::DuplicateClaim { claim: 1, first: 0 }.to_string(),
+        "claim 1 repeats claim 0"
     );
     assert_eq!(
         CertificateError::UnsupportedVersion(2).to_string(),
