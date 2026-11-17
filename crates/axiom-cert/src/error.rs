@@ -2,7 +2,12 @@ use axiom_core::{ProbabilityError, TransitionMatrixError, TransitionRowError};
 use thiserror::Error;
 
 /// The reason a certificate could not be written or read.
-#[derive(Debug, Error)]
+///
+/// No variant echoes text from the certificate. Errors report positions,
+/// counts and limits only, so a hostile certificate cannot fill a log with
+/// its own content or inject terminal control sequences through an error
+/// message.
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
 #[non_exhaustive]
 pub enum CertificateError {
     /// The certificate text is larger than the format allows.
@@ -13,23 +18,37 @@ pub enum CertificateError {
         /// The largest size the format allows.
         limit: usize,
     },
-    /// The text is not valid JSON, or does not have the fields the format
-    /// requires, or has fields it does not allow.
-    #[error("certificate is not valid version 1 JSON: {0}")]
-    Json(#[from] serde_json::Error),
+    /// The text is not valid JSON, has a field the format does not allow,
+    /// repeats a field, lacks a required field, or has a value of the wrong
+    /// JSON type.
+    #[error("certificate is not valid version 1 JSON (line {line}, column {column})")]
+    Json {
+        /// The one-based line where parsing stopped.
+        line: usize,
+        /// The one-based column where parsing stopped.
+        column: usize,
+    },
     /// The `format` field is not `axiom-certificate`.
-    #[error("unsupported certificate format {0:?}")]
-    UnsupportedFormat(String),
+    #[error("certificate format is not axiom-certificate")]
+    UnsupportedFormat,
     /// The `version` field names a version this reader does not implement.
     #[error("unsupported certificate version {0}")]
     UnsupportedVersion(u32),
+    /// The model has more states than the format allows.
+    #[error("model has {states} states; the limit is {limit}")]
+    TooManyStates {
+        /// The number of rows in the model.
+        states: usize,
+        /// The largest number of states the format allows.
+        limit: usize,
+    },
     /// A fraction is not written as canonical decimal strings in lowest terms.
-    #[error("fraction {num}/{den} is not in canonical form")]
+    #[error("row {row}, entry {entry}: fraction is not in canonical form")]
     NonCanonicalFraction {
-        /// The numerator text as written.
-        num: String,
-        /// The denominator text as written.
-        den: String,
+        /// The index of the row holding the entry.
+        row: usize,
+        /// The index of the entry within its row.
+        entry: usize,
     },
     /// A fraction is not a probability.
     #[error("row {row}, entry {entry}: {source}")]
@@ -70,8 +89,20 @@ pub enum CertificateError {
         /// The index of the claim in the claim list.
         claim: usize,
         /// The row the claim refers to.
-        row: usize,
+        row: u64,
         /// The number of rows in the model.
         rows: usize,
     },
+}
+
+impl From<serde_json::Error> for CertificateError {
+    /// Keeps only the position of a JSON error. `serde_json` messages quote
+    /// unknown field and variant names from the input, so the message itself
+    /// is discarded.
+    fn from(error: serde_json::Error) -> Self {
+        Self::Json {
+            line: error.line(),
+            column: error.column(),
+        }
+    }
 }

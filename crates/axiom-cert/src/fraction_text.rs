@@ -6,7 +6,7 @@ use crate::CertificateError;
 
 /// The largest number of decimal digits allowed in a numerator or
 /// denominator.
-const MAX_DIGITS: usize = 256;
+const MAX_DIGITS: usize = 64;
 
 /// A non-negative fraction as it appears in a certificate: two decimal
 /// strings, in lowest terms.
@@ -28,26 +28,24 @@ impl FractionText {
         }
     }
 
-    /// Parses the fraction, rejecting every encoding other than the
-    /// canonical one.
-    pub(crate) fn to_fraction(&self) -> Result<BigRational, CertificateError> {
+    /// Parses the fraction at `row`, `entry`, rejecting every encoding other
+    /// than the canonical one.
+    pub(crate) fn to_fraction(
+        &self,
+        row: usize,
+        entry: usize,
+    ) -> Result<BigRational, CertificateError> {
+        let non_canonical = CertificateError::NonCanonicalFraction { row, entry };
         let numerator = canonical_integer(&self.num, Zero::Allowed);
         let denominator = canonical_integer(&self.den, Zero::Forbidden);
         let (Some(numerator), Some(denominator)) = (numerator, denominator) else {
-            return Err(self.non_canonical());
+            return Err(non_canonical);
         };
         let value = BigRational::new(numerator.clone(), denominator.clone());
         if value.numer() != &numerator || value.denom() != &denominator {
-            return Err(self.non_canonical());
+            return Err(non_canonical);
         }
         Ok(value)
-    }
-
-    fn non_canonical(&self) -> CertificateError {
-        CertificateError::NonCanonicalFraction {
-            num: self.num.clone(),
-            den: self.den.clone(),
-        }
     }
 }
 
