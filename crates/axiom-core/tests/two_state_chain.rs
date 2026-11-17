@@ -14,6 +14,7 @@ fn link_chain() -> Result<TwoStateChain, TestError> {
 
 fn row_values(chain: &TwoStateChain) -> Vec<Vec<BigRational>> {
     chain
+        .matrix()
         .rows()
         .iter()
         .map(|row| {
@@ -99,7 +100,7 @@ fn any_probability() -> impl Strategy<Value = Probability> {
 proptest! {
     #[test]
     fn every_row_of_every_chain_sums_to_exactly_one(a in any_probability(), b in any_probability()) {
-        for row in TwoStateChain::new(a, b).rows() {
+        for row in TwoStateChain::new(a, b).matrix().rows() {
             let sum = row
                 .probabilities()
                 .iter()
