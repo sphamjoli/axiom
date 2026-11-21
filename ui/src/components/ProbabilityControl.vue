@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import type { Fraction } from "../engine/types";
-import { fromHundredths, parseProbability, text } from "../modelText";
-import { approx } from "../format";
+import { approx, fractionText as text, fromHundredths, parseProbability } from "../format";
 
 const props = defineProps<{ id: string; label: string; value: Fraction }>();
 const emit = defineEmits<{ change: [value: Fraction] }>();

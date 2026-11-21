@@ -16,10 +16,17 @@ const WORKER_FAILED: SimulateResult = {
   error: { code: "worker-failed", message: "The simulation worker stopped. Reload the page to try again.", line: null, column: null },
 };
 
+function isReply(data: unknown): data is SimReply {
+  if (typeof data !== "object" || data === null) return false;
+  const reply = data as Record<string, unknown>;
+  return Number.isSafeInteger(reply.id) && typeof reply.json === "string";
+}
+
 function simWorker(): Worker {
   if (worker) return worker;
   const created = new Worker(new URL("./simWorker.ts", import.meta.url), { type: "module" });
-  created.onmessage = (event: MessageEvent<SimReply>) => {
+  created.onmessage = (event: MessageEvent<unknown>) => {
+    if (!isReply(event.data)) return;
     const settle = waiting.get(event.data.id);
     if (!settle) return;
     waiting.delete(event.data.id);

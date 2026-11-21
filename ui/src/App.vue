@@ -12,11 +12,15 @@ import { complement } from "./format";
 import ModelGuide from "./components/ModelGuide.vue";
 import { TEMPLATES } from "./models/templates";
 import { modelClock as clock } from "./playback";
+import { decodeRun } from "./shareLink";
 import { wasmEngine } from "./engine/wasm";
 
 const engine: Engine = wasmEngine;
 
-const source = ref(TEMPLATES[0]?.source ?? "");
+// A shared run in the URL fragment brings its model; the Simulate panel
+// replays it. The model text goes only to the engine and the editor.
+const sharedRun = decodeRun(window.location.hash);
+const source = ref(sharedRun?.model ?? TEMPLATES[0]?.source ?? "");
 const analysis = shallowRef<Analysis | null>(null);
 const diagnostics = ref<Diagnostic[]>([]);
 
@@ -128,7 +132,8 @@ watchEffect(() => document.documentElement.classList.toggle("dark", dark.value))
         v-if="analysis?.chain || analysis?.retry"
         :engine="engine"
         :source="source"
-        :kind="analysis.chain ? 'chain' : 'retry'"
+        :analysis="analysis"
+        :initial-run="sharedRun"
         class="lg:col-span-2"
       />
     </main>

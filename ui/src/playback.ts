@@ -57,6 +57,22 @@ export function createClock() {
     t.value = Math.min(last.value, t.value + 1);
   }
 
+  function back(): void {
+    stop();
+    t.value = Math.max(0, t.value - 1);
+  }
+
+  function end(): void {
+    stop();
+    t.value = last.value;
+  }
+
+  // Shows step `to`, for a scrubber.
+  function seek(to: number): void {
+    stop();
+    t.value = Math.min(last.value, Math.max(0, Math.round(to)));
+  }
+
   // Sets the range and plays it from step 0.
   function restart(steps: number): void {
     stop();
@@ -65,15 +81,8 @@ export function createClock() {
     play();
   }
 
-  // Sets the range and shows its end without playing.
-  function settle(steps: number): void {
-    stop();
-    last.value = Math.max(0, steps);
-    t.value = last.value;
-  }
-
   const done = computed(() => t.value >= last.value);
-  return { t, last, playing, done, play, pause: stop, step, restart, settle };
+  return { t, last, playing, done, play, pause: stop, step, back, end, seek, restart };
 }
 
 export type Clock = ReturnType<typeof createClock>;
