@@ -35,7 +35,10 @@ dependencies = [
  "axiom-cert",
  "axiom-core",
  "axiom-model",
+ "axiom-sim",
  "clap",
+ "num-bigint",
+ "num-rational",
  "num-traits",
  "thiserror",
 ]

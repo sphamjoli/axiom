@@ -25,7 +25,7 @@ enum Layer {
 
 /// The checker's reading rules: the text it prints, the layer it prints it
 /// in, and the code `axiom check` reports.
-const RULES: [(&str, Layer, &str); 57] = [
+const RULES: [(&str, Layer, &str); 63] = [
     (
         "unexpected character",
         Layer::Json,
@@ -270,6 +270,36 @@ const RULES: [(&str, Layer, &str); 57] = [
         "tolerance must be positive",
         Layer::Format,
         "checker-tolerance-not-positive",
+    ),
+    (
+        "unknown estimate quantity",
+        Layer::Format,
+        "checker-unknown-quantity",
+    ),
+    (
+        "samples must be an integer",
+        Layer::Format,
+        "checker-samples-not-integer",
+    ),
+    (
+        "samples are above the limit",
+        Layer::Format,
+        "checker-samples-out-of-range",
+    ),
+    (
+        "epsilon and delta must lie strictly between zero and one",
+        Layer::Format,
+        "checker-confidence-out-of-range",
+    ),
+    (
+        "seed must be an integer",
+        Layer::Format,
+        "checker-seed-not-integer",
+    ),
+    (
+        "seed is above the limit",
+        Layer::Format,
+        "checker-seed-out-of-range",
     ),
 ];
 

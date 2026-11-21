@@ -50,14 +50,45 @@ pub const MAX_OUTPUT_BYTES: u64 = 64 * 1024;
 /// How often the checker is polled for exit while it runs.
 const POLL_INTERVAL: Duration = Duration::from_millis(20);
 
+/// How certain an accepted claim is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Certainty {
+    /// Proven for the model by the checker: every claim kind but `Estimate`.
+    Proven,
+    /// An `Estimate` claim: the checker accepted its sample count, not its
+    /// value.
+    Estimated,
+}
+
+impl Certainty {
+    /// The certainty of a claim, decided by its kind alone, so the word the
+    /// checker prints is only ever compared against it, never trusted.
+    fn of(claim: &str) -> Self {
+        if claim.ends_with(" Estimate") {
+            Self::Estimated
+        } else {
+            Self::Proven
+        }
+    }
+
+    /// The word printed after an accepted verdict.
+    const fn word(self) -> &'static str {
+        match self {
+            Self::Proven => "proven",
+            Self::Estimated => "estimated",
+        }
+    }
+}
+
 /// The checker's verdict on one claim.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Verdict {
     /// The claim's line as printed by the checker, such as
     /// `claim 0 Mass row 0`.
     claim: String,
-    /// Whether the checker accepted the claim.
-    accepted: bool,
+    /// The certainty of the claim if the checker accepted it, or `None` if
+    /// it rejected it.
+    accepted: Option<Certainty>,
 }
 
 /// The verdicts on every claim and how long the check took.
@@ -71,7 +102,9 @@ impl Report {
     /// Whether every claim was accepted.
     #[must_use]
     pub fn all_accepted(&self) -> bool {
-        self.verdicts.iter().all(|verdict| verdict.accepted)
+        self.verdicts
+            .iter()
+            .all(|verdict| verdict.accepted.is_some())
     }
 
     /// The number of claims the checker gave a verdict on.
@@ -84,17 +117,29 @@ impl Report {
 impl fmt::Display for Report {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         for verdict in &self.verdicts {
-            let word = if verdict.accepted {
-                "accepted"
-            } else {
-                "rejected"
-            };
-            writeln!(formatter, "{}: {word}", verdict.claim)?;
+            match verdict.accepted {
+                Some(certainty) => {
+                    writeln!(
+                        formatter,
+                        "{}: accepted ({})",
+                        verdict.claim,
+                        certainty.word()
+                    )?;
+                }
+                None => writeln!(formatter, "{}: rejected", verdict.claim)?,
+            }
         }
-        let accepted = self.verdicts.iter().filter(|v| v.accepted).count();
+        let count = |certainty| {
+            self.verdicts
+                .iter()
+                .filter(|v| v.accepted == Some(certainty))
+                .count()
+        };
+        let (proven, estimated) = (count(Certainty::Proven), count(Certainty::Estimated));
         writeln!(
             formatter,
-            "{accepted} of {} claims accepted in {} ms",
+            "{} of {} claims accepted ({proven} proven, {estimated} estimated) in {} ms",
+            proven + estimated,
             self.verdicts.len(),
             self.elapsed.as_millis()
         )
@@ -229,7 +274,7 @@ pub fn interpret(code: i32, stdout: &str, elapsed: Duration) -> Result<Report, C
     let Output { verdicts, error } = parse_output(stdout)?;
     match (code, error) {
         (0 | 1, _) if !verdicts.is_empty() => {
-            if (code == 0) == verdicts.iter().all(|verdict| verdict.accepted) {
+            if (code == 0) == verdicts.iter().all(|verdict| verdict.accepted.is_some()) {
                 Ok(Report { verdicts, elapsed })
             } else {
                 Err(CliError::CheckerStatusMismatch)
@@ -241,7 +286,8 @@ pub fn interpret(code: i32, stdout: &str, elapsed: Duration) -> Result<Report, C
 }
 
 /// Reads the verdict lines and the first `error:` line; any other line is
-/// unexpected.
+/// unexpected, including an accepted verdict whose certainty word does not
+/// match its claim kind.
 fn parse_output(stdout: &str) -> Result<Output<'_>, CliError> {
     let mut output = Output {
         verdicts: Vec::new(),
@@ -252,10 +298,14 @@ fn parse_output(stdout: &str) -> Result<Output<'_>, CliError> {
             output.error = output.error.or(Some(reason));
             continue;
         }
-        let (claim, accepted) = line
-            .strip_suffix(": accepted")
-            .map(|claim| (claim, true))
-            .or_else(|| line.strip_suffix(": rejected").map(|claim| (claim, false)))
+        let accepted_as = |certainty: Certainty| {
+            line.strip_suffix(&format!(": accepted ({})", certainty.word()))
+                .filter(|claim| Certainty::of(claim) == certainty)
+                .map(|claim| (claim, Some(certainty)))
+        };
+        let (claim, accepted) = accepted_as(Certainty::Proven)
+            .or_else(|| accepted_as(Certainty::Estimated))
+            .or_else(|| line.strip_suffix(": rejected").map(|claim| (claim, None)))
             .filter(|(claim, _)| is_claim(claim))
             .ok_or(CliError::CheckerUnexpectedOutput)?;
         output.verdicts.push(Verdict {
@@ -268,7 +318,7 @@ fn parse_output(stdout: &str) -> Result<Output<'_>, CliError> {
 
 /// Whether `text` has the form `claim <n> Mass row <r>` or `claim <n> <kind>`
 /// for one of the kinds `FixedPoint`, `Contraction`, `ConvergenceBound`,
-/// `Termination` and `ParametricContraction`.
+/// `Termination`, `ParametricContraction` and `Estimate`.
 fn is_claim(text: &str) -> bool {
     let words: Vec<&str> = text.split(' ').collect();
     let number = |word: &str| !word.is_empty() && word.bytes().all(|b| b.is_ascii_digit());
@@ -281,7 +331,8 @@ fn is_claim(text: &str) -> bool {
             | "Contraction"
             | "ConvergenceBound"
             | "Termination"
-            | "ParametricContraction",
+            | "ParametricContraction"
+            | "Estimate",
         ] => number(index),
         _ => false,
     }

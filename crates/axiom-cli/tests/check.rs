@@ -22,12 +22,12 @@ fn lean_accepted_certificate_exits_zero_with_verdicts_and_timing() -> Result<(),
     if !lake_available("lean_accepted_certificate_exits_zero_with_verdicts_and_timing")? {
         return Ok(());
     }
-    let output = check(&repo_root().join("fixtures/certificates/links-convergence.json"))?;
+    let output = check(&repo_root().join("fixtures/certificates/links-estimate.json"))?;
     let stdout = String::from_utf8_lossy(&output.stdout);
     ensure(output.status.code() == Some(0), "expected exit status 0")?;
     ensure(
-        stdout.starts_with("claim 0 Mass row 0: accepted\n")
-            && stdout.contains("\nclaim 4 ConvergenceBound: accepted\n5 of 5 claims accepted in "),
+        stdout.starts_with("claim 0 Mass row 0: accepted (proven)\n")
+            && stdout.contains("\nclaim 4 ConvergenceBound: accepted (proven)\nclaim 5 Estimate: accepted (estimated)\n6 of 6 claims accepted (5 proven, 1 estimated) in "),
         "missing verdicts or summary",
     )
 }

@@ -12,6 +12,7 @@ use std::io;
 
 use axiom_cert::CertificateError;
 use axiom_model::ModelError;
+use axiom_sim::SimError;
 use thiserror::Error;
 
 use crate::outcome::Outcome;
@@ -213,6 +214,11 @@ pub enum CliError {
     /// The certificate could not be built or encoded.
     #[error(transparent)]
     Certificate(#[from] CertificateError),
+    /// The model could not be sampled or the estimate could not be made:
+    /// `--epsilon` or `--delta` out of range, a model with parameters, or no
+    /// sample count that meets the confidence.
+    #[error(transparent)]
+    Simulation(#[from] SimError),
     /// `lake` could not be started or waited for.
     #[error("cannot run the Lean checker with lake")]
     CheckerNotStarted,
@@ -250,6 +256,7 @@ impl CliError {
             Self::ParametricChain => "parametric-chain",
             Self::ParametricRetry => "parametric-retry",
             Self::Certificate(error) => error.code(),
+            Self::Simulation(error) => error.code(),
             Self::CheckerNotStarted => "checker-not-started",
             Self::CheckerTimeout { .. } => "checker-timeout",
             Self::CheckerRefused(reason) => reason.code(),
@@ -269,7 +276,8 @@ impl CliError {
             | Self::Model(_)
             | Self::ParametricChain
             | Self::ParametricRetry
-            | Self::Certificate(_) => Outcome::Refused,
+            | Self::Certificate(_)
+            | Self::Simulation(_) => Outcome::Refused,
             Self::CheckerRefused(reason) => reason.outcome(),
             Self::ReadFailed { .. }
             | Self::WriteFailed { .. }

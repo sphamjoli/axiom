@@ -5,11 +5,12 @@ use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 
-use axiom_cert::{Certificate, End, Interval};
+use axiom_cert::{Certificate, End, Estimate, Interval, Model, Quantity};
 use axiom_core::Probability;
 use axiom_model::{AffineWeight, Bound, Chain, CheckedModel, MAX_INPUT_BYTES, Parameter};
 use num_traits::{One, Zero};
 
+use crate::cli::EstimateRequest;
 use crate::error::{CliError, FileRole, IoFailure};
 
 /// What `analyse` wrote, for the summary line.
@@ -32,8 +33,14 @@ impl fmt::Display for Summary {
     }
 }
 
-/// The attempt count of the `failure_after` part of a `Termination` claim.
+/// The attempt count of the `failure_after` part of a `Termination` claim,
+/// and the attempts each sampled retry may make for a `success` estimate.
 const FAILURE_ATTEMPTS: u64 = 20;
+
+/// The steps of each sampled trajectory for a `steady-state` estimate. The
+/// trajectories start in the first state; after this many steps the links
+/// model is within `0.6^64 < 10^-14` of its steady state.
+const STEADY_STATE_STEPS: usize = 64;
 
 /// Reads the model at `model` and writes a certificate to `cert`: for a
 /// chain, a `Mass` claim for every row, plus `FixedPoint`, `Contraction` and
@@ -46,8 +53,13 @@ const FAILURE_ATTEMPTS: u64 = 20;
 /// Returns an error when the model cannot be read or is invalid, when it is
 /// a parametric retry or a parametric chain of another shape, when a
 /// parametric range includes a chain that does not contract, or when the
-/// certificate cannot be written.
-pub fn run(model: &Path, cert: &Path) -> Result<Summary, CliError> {
+/// certificate cannot be written. With `estimate`, it also returns the
+/// sampling errors of [`estimated`].
+pub fn run(
+    model: &Path,
+    cert: &Path,
+    estimate: Option<&EstimateRequest>,
+) -> Result<Summary, CliError> {
     let source = read_model(model)?;
     let (description, certificate) = match axiom_model::parse(&source)? {
         CheckedModel::Chain(chain) => {
@@ -73,6 +85,10 @@ pub fn run(model: &Path, cert: &Path) -> Result<Summary, CliError> {
             )
         }
     };
+    let certificate = match estimate {
+        Some(request) => estimated(certificate, request)?,
+        None => certificate,
+    };
     let text = certificate.to_json()?;
     std::fs::write(cert, text).map_err(|error| CliError::WriteFailed {
         file: FileRole::Certificate,
@@ -85,10 +101,72 @@ pub fn run(model: &Path, cert: &Path) -> Result<Summary, CliError> {
     })
 }
 
+/// `certificate` with an `Estimate` claim appended: `steady-state` for a
+/// two-state chain, from trajectories of [`STEADY_STATE_STEPS`] steps that
+/// start in the first state, or `success` for a retry, from runs of at most
+/// [`FAILURE_ATTEMPTS`] attempts. The sample count is the least that meets
+/// Hoeffding's bound for the requested tolerance and failure probability,
+/// and it is checked against the format's limit before any sampling.
+///
+/// # Errors
+///
+/// Returns the simulation error when `epsilon` or `delta` is not strictly
+/// between zero and one or the model has parameters, and the certificate
+/// error when the sample count is above the limit or the chain does not
+/// have two states.
+fn estimated(certificate: Certificate, request: &EstimateRequest) -> Result<Certificate, CliError> {
+    let samples = axiom_sim::required_samples(&request.epsilon, &request.delta)?;
+    let index = certificate.claims().len();
+    Estimate::check_samples(index, samples)?;
+    let count = usize::try_from(samples).map_err(|_| {
+        CliError::Certificate(axiom_cert::CertificateError::SamplesOutOfRange {
+            claim: index,
+            limit: axiom_cert::MAX_SAMPLES,
+        })
+    })?;
+    let (quantity, hits) = match certificate.model() {
+        Model::Chain(matrix) if matrix.states() == 2 => {
+            let runs = axiom_sim::sample_chain(matrix, 0, STEADY_STATE_STEPS, count, request.seed)?;
+            (Quantity::SteadyState, runs.count(1))
+        }
+        Model::Chain(matrix) => {
+            return Err(CliError::Certificate(
+                axiom_cert::CertificateError::NotTwoState {
+                    claim: index,
+                    states: matrix.states(),
+                },
+            ));
+        }
+        Model::Retry { success } => {
+            let runs = axiom_sim::sample_retry(success, FAILURE_ATTEMPTS, count, request.seed);
+            (Quantity::Success, runs.successes())
+        }
+        _ => return Err(CliError::Simulation(axiom_sim::SimError::Parametric)),
+    };
+    let mean = axiom_sim::Estimate::from_hits(
+        hits,
+        samples,
+        request.epsilon.clone(),
+        request.delta.clone(),
+    )?;
+    let value = Probability::try_new(&mean.value)
+        .map_err(|_| CliError::Simulation(axiom_sim::SimError::HitsExceedSamples))?;
+    Ok(certificate.with_estimate(Estimate {
+        quantity,
+        value,
+        samples,
+        epsilon: mean.epsilon,
+        delta: mean.delta,
+        seed: request.seed,
+    })?)
+}
+
 /// The ranges of `a` and `b` for a two-state chain whose exit
 /// probabilities are exactly two distinct parameters, `a` from the first
 /// state and `b` from the second, or `None` for any other parametric chain.
-/// The diagonal needs no check: the model checker has shown that every row
+/// The parameters are distinct because the model checker rejects a declared
+/// parameter that is never used, and the diagonal needs no check because it
+/// has shown that every row
 /// sums to one.
 fn parametric_ranges(chain: &Chain) -> Option<(Interval, Interval)> {
     let [first, second] = chain.rows.as_slice() else {
@@ -96,7 +174,7 @@ fn parametric_ranges(chain: &Chain) -> Option<(Interval, Interval)> {
     };
     let a = sole_parameter(first.get(1)?)?;
     let b = sole_parameter(second.first()?)?;
-    if a == b || chain.parameters.len() != 2 {
+    if chain.parameters.len() != 2 {
         return None;
     }
     Some((

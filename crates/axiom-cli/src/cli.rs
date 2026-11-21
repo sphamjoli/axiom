@@ -6,6 +6,8 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use clap::{Args, Parser, Subcommand};
+use num_bigint::BigInt;
+use num_rational::BigRational;
 
 use crate::check::{DEFAULT_TIMEOUT_SECS, LEAN_DIR_VARIABLE, TIMEOUT_VARIABLE};
 use crate::outcome::Outcome;
@@ -36,6 +38,9 @@ pub enum Command {
         /// The certificate file to write.
         #[arg(long, value_name = "OUT")]
         cert: PathBuf,
+        /// Whether to add an estimated claim from sampling.
+        #[command(flatten)]
+        estimate: EstimateArgs,
     },
     /// Run the Lean checker on a certificate and print the verdict on each
     /// claim.
@@ -47,6 +52,84 @@ pub enum Command {
         #[command(flatten)]
         checker: CheckerArgs,
     },
+}
+
+/// The options of `analyse --estimate`: sample the model from a seed and add
+/// an `Estimate` claim. Without `--estimate` none of them may be given, and
+/// the certificate is the same as before estimates existed.
+#[derive(Debug, Args)]
+pub struct EstimateArgs {
+    /// Add an `Estimate` claim from sampling the model; needs `--seed`.
+    #[arg(long, requires = "seed")]
+    pub estimate: bool,
+    /// The seed the samples are drawn with.
+    #[arg(long, value_name = "U64", requires = "estimate")]
+    pub seed: Option<u64>,
+    /// The tolerance, a fraction such as 1/100 strictly between zero and one.
+    #[arg(long, value_name = "FRACTION", requires = "estimate", value_parser = fraction)]
+    pub epsilon: Option<BigRational>,
+    /// The failure probability, a fraction such as 1/1000 strictly between
+    /// zero and one.
+    #[arg(long, value_name = "FRACTION", requires = "estimate", value_parser = fraction)]
+    pub delta: Option<BigRational>,
+}
+
+/// The tolerance used when `--epsilon` is not given.
+pub const DEFAULT_EPSILON: (u32, u32) = (1, 100);
+
+/// The failure probability used when `--delta` is not given.
+pub const DEFAULT_DELTA: (u32, u32) = (1, 1000);
+
+/// The longest numerator or denominator `--epsilon` and `--delta` accept,
+/// in decimal digits, the certificate format's limit.
+const MAX_FRACTION_DIGITS: usize = 64;
+
+/// What `analyse --estimate` was asked for, with the defaults filled in.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EstimateRequest {
+    /// The seed the samples are drawn with.
+    pub seed: u64,
+    /// The tolerance.
+    pub epsilon: BigRational,
+    /// The failure probability.
+    pub delta: BigRational,
+}
+
+impl EstimateArgs {
+    /// The estimate requested, or `None` without `--estimate`. Clap has
+    /// already required `--seed` with `--estimate`.
+    #[must_use]
+    pub fn request(&self) -> Option<EstimateRequest> {
+        let ratio = |(n, d): (u32, u32)| BigRational::new(BigInt::from(n), BigInt::from(d));
+        let seed = self.seed.filter(|_| self.estimate)?;
+        Some(EstimateRequest {
+            seed,
+            epsilon: self
+                .epsilon
+                .clone()
+                .unwrap_or_else(|| ratio(DEFAULT_EPSILON)),
+            delta: self.delta.clone().unwrap_or_else(|| ratio(DEFAULT_DELTA)),
+        })
+    }
+}
+
+/// Parses `n/d` or `n`, with unsigned decimal parts of at most 64 digits and
+/// a positive denominator. The error names no part of the input; the usage
+/// message reports only that the value is invalid.
+fn fraction(text: &str) -> Result<BigRational, &'static str> {
+    let part = |digits: &str| -> Option<BigInt> {
+        let ok = !digits.is_empty()
+            && digits.len() <= MAX_FRACTION_DIGITS
+            && digits.bytes().all(|byte| byte.is_ascii_digit());
+        ok.then(|| digits.parse().ok()).flatten()
+    };
+    let (numerator, denominator) = text.split_once('/').unwrap_or((text, "1"));
+    match (part(numerator), part(denominator)) {
+        (Some(numerator), Some(denominator)) if denominator != BigInt::from(0) => {
+            Ok(BigRational::new(numerator, denominator))
+        }
+        _ => Err("expected a fraction such as 1/100"),
+    }
 }
 
 /// Where the Lean checker runs from and how long it may run.

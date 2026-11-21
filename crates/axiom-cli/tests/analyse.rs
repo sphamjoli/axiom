@@ -60,7 +60,41 @@ fn reproduces_the_golden_certificates() -> Result<(), TestError> {
         &[],
         "links-param.json",
         "parametric chain links: wrote 1 claims",
+    )?;
+    reproduces(
+        "links.axm",
+        &["--estimate", "--seed", "42"],
+        "links-estimate.json",
+        "chain links: 2 states, 2 rows; wrote 6 claims",
     )
+}
+
+#[test]
+fn refuses_an_estimate_it_cannot_make() -> Result<(), TestError> {
+    let dir = scratch("estimate-refused")?;
+    let out = dir.join("out.json");
+    let fixtures = repo_root().join("fixtures/models");
+    let cases = [
+        ("links.axm", "1", "axiom: invalid-epsilon: "),
+        ("links.axm", "1/100000", "axiom: samples-out-of-range: "),
+        ("links-param.axm", "1/100", "axiom: parametric-model: "),
+    ];
+    for (model, epsilon, code) in cases {
+        let output = Command::new(env!("CARGO_BIN_EXE_axiom"))
+            .arg("analyse")
+            .arg(fixtures.join(model))
+            .args(["--cert"])
+            .arg(&out)
+            .args(["--estimate", "--seed", "1", "--epsilon", epsilon])
+            .output()?;
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        ensure(
+            output.status.code() == Some(2) && stderr.starts_with(code),
+            format!("{model} {epsilon}: {stderr}"),
+        )?;
+        ensure(!out.exists(), format!("{model}: a certificate was written"))?;
+    }
+    Ok(())
 }
 
 /// Runs `axiom analyse <model> --cert <out>` from `cwd`.

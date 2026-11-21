@@ -13,6 +13,7 @@ use axiom_cli::checker_rule::CheckerRule;
 use axiom_cli::error::{CheckerReason, CliError, FileRole, IoFailure};
 use axiom_cli::outcome::Outcome;
 use axiom_model::{ModelError, Position};
+use axiom_sim::SimError;
 use common::{TestError, ensure};
 
 fn every_error() -> Vec<CliError> {
@@ -158,7 +159,8 @@ fn every_error_has_a_stable_code_fixed_message_and_outcome() -> Result<(), TestE
 }
 
 #[test]
-fn model_and_certificate_errors_keep_their_own_code_and_are_refusals() -> Result<(), TestError> {
+fn model_certificate_and_simulation_errors_keep_their_own_code_and_are_refusals()
+-> Result<(), TestError> {
     let model = CliError::from(ModelError::MissingRow {
         at: Position {
             line: 2,
@@ -175,6 +177,12 @@ fn model_and_certificate_errors_keep_their_own_code_and_are_refusals() -> Result
         certificate.report() == "axiom: no-claims: certificate makes no claims"
             && certificate.outcome() == Outcome::Refused,
         certificate.report(),
+    )?;
+    let simulation = CliError::from(SimError::InvalidDelta);
+    ensure(
+        simulation.report() == "axiom: invalid-delta: delta must lie strictly between zero and one"
+            && simulation.outcome() == Outcome::Refused,
+        simulation.report(),
     )
 }
 

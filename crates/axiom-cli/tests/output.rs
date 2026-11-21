@@ -15,7 +15,7 @@ fn failure(code: i32, stdout: &str) -> Option<CliError> {
 
 #[test]
 fn accepts_verdicts_that_agree_with_the_exit_status() -> Result<(), CliError> {
-    let all = "claim 0 Mass row 0: accepted\nclaim 1 ConvergenceBound: accepted\n";
+    let all = "claim 0 Mass row 0: accepted (proven)\nclaim 1 Estimate: accepted (estimated)\n";
     let report = interpret(0, all, NO_TIME)?;
     assert!(report.all_accepted());
     assert_eq!(report.claims(), 2);
@@ -25,33 +25,49 @@ fn accepts_verdicts_that_agree_with_the_exit_status() -> Result<(), CliError> {
 }
 
 #[test]
-fn prints_each_verdict_and_a_summary() -> Result<(), CliError> {
-    let report = interpret(
-        1,
-        "claim 0 FixedPoint: accepted\nclaim 1 Contraction: rejected\n",
-        NO_TIME,
-    )?;
+fn prints_each_verdict_with_its_certainty_and_a_summary() -> Result<(), CliError> {
+    let lines = "claim 0 FixedPoint: accepted (proven)\nclaim 1 Contraction: rejected\nclaim 2 Estimate: accepted (estimated)\nclaim 3 ParametricContraction: accepted (proven)\n";
+    let report = interpret(1, lines, NO_TIME)?;
     assert_eq!(
         report.to_string(),
-        "claim 0 FixedPoint: accepted\nclaim 1 Contraction: rejected\n1 of 2 claims accepted in 0 ms\n"
+        format!("{lines}3 of 4 claims accepted (2 proven, 1 estimated) in 0 ms\n")
     );
     Ok(())
 }
 
 #[test]
+fn rejects_a_certainty_that_does_not_match_the_claim_kind() {
+    for stdout in [
+        "claim 0 Estimate: accepted (proven)\n",
+        "claim 0 Mass row 0: accepted (estimated)\n",
+        "claim 0 Termination: accepted\n",
+        "claim 0 Termination: rejected (proven)\n",
+    ] {
+        assert_eq!(
+            failure(0, stdout),
+            Some(CliError::CheckerUnexpectedOutput),
+            "{stdout}"
+        );
+    }
+}
+
+#[test]
 fn rejects_an_exit_status_that_disagrees_with_the_verdicts() {
     let mismatch = Some(CliError::CheckerStatusMismatch);
-    assert_eq!(failure(1, "claim 0 Mass row 0: accepted\n"), mismatch);
+    assert_eq!(
+        failure(1, "claim 0 Mass row 0: accepted (proven)\n"),
+        mismatch
+    );
     assert_eq!(failure(0, "claim 0 Mass row 0: rejected\n"), mismatch);
 }
 
 #[test]
 fn rejects_an_unexpected_line() {
     for stdout in [
-        "claim 0 Mass row 0: accepted\nhello\n",
-        "claim 0 Unknown: accepted\n",
-        "claim x Termination: accepted\n",
-        "claim 0 Mass row: accepted\n",
+        "claim 0 Mass row 0: accepted (proven)\nhello\n",
+        "claim 0 Unknown: accepted (proven)\n",
+        "claim x Termination: accepted (proven)\n",
+        "claim 0 Mass row: accepted (proven)\n",
         "claim 0 Mass row 0: maybe\n",
     ] {
         assert_eq!(

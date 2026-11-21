@@ -1,8 +1,9 @@
 //! The `axiom` command line.
 //!
-//! `axiom analyse <MODEL> --cert <OUT>` reads a model and, for a model
-//! without parameters, writes a certificate of the strongest claims the
-//! engine can make about it. `axiom check <CERT>` runs the Lean checker on a
+//! `axiom analyse <MODEL> --cert <OUT>` reads a model and writes a
+//! certificate of the strongest claims the engine can make about it; with
+//! `--estimate --seed <U64>` it also samples the model and adds an
+//! estimated claim. `axiom check <CERT>` runs the Lean checker on a
 //! certificate and reports the verdict on each claim. The exit codes are
 //! those of [`Outcome`], listed by `axiom --help`. Errors are printed as
 //! `axiom: <code>: <message>`, the same bytes on every machine.
@@ -38,7 +39,11 @@ fn main() -> ExitCode {
 
 fn run(cli: Cli) -> Outcome {
     let result = match cli.command {
-        Command::Analyse { model, cert } => analyse::run(&model, &cert).map(|summary| {
+        Command::Analyse {
+            model,
+            cert,
+            estimate,
+        } => analyse::run(&model, &cert, estimate.request().as_ref()).map(|summary| {
             println!("{summary}");
             Outcome::Accepted
         }),
