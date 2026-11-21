@@ -76,6 +76,18 @@
   .input[aria-invalid="true"] {
     @apply border-rejected;
   }
+  .step {
+    @apply flex h-full items-start gap-2 rounded-md border border-rule bg-sheet px-3 py-2 text-ink hover:bg-paper;
+  }
+  .step-n {
+    @apply inline-flex size-5 shrink-0 items-center justify-center rounded-full border border-signal font-mono text-xs text-signal;
+  }
+  .range {
+    accent-color: var(--signal);
+  }
+  .fade {
+    transition: opacity 200ms var(--ease-out-snap);
+  }
   .sim-result {
     animation: settle 180ms var(--ease-out-snap);
   }
@@ -98,5 +110,8 @@
   }
   .sim-result {
     animation: none;
+  }
+  .fade {
+    transition: none;
   }
 }

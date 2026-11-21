@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import type { Chain } from "../engine/types";
+import type { Chain, Fraction } from "../engine/types";
+import { approx } from "../format";
 
-const props = defineProps<{ chain: Chain }>();
+// `mass`, when given, is the probability of each state at the current step
+// of the playback clock; each state's fill shows it.
+const props = defineProps<{ chain: Chain; mass?: Fraction[] | null; step?: number }>();
 
 const W = 420;
 const H = 240;
@@ -56,7 +59,10 @@ const edges = computed(() =>
 
 <template>
   <section class="panel">
-    <h2 class="panel-title">Transition graph</h2>
+    <div class="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+      <h2 class="panel-title mb-0">Transition graph</h2>
+      <p v-if="mass" class="text-sm text-ink-muted">Fill: probability of each state at step <span class="font-mono text-ink">{{ step }}</span></p>
+    </div>
     <svg :viewBox="`0 0 ${W} ${H}`" class="h-auto w-full" role="img" :aria-label="`Transition graph of chain ${chain.name}`">
       <defs>
         <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
@@ -67,8 +73,9 @@ const edges = computed(() =>
         <path :d="e.d" fill="none" stroke-width="1.75" marker-end="url(#arrow)" class="stroke-ink-muted" />
         <text :x="e.lx" :y="e.ly" text-anchor="middle" class="fill-ink font-mono text-[13px]">{{ e.text }}</text>
       </g>
-      <g v-for="n in nodes" :key="n.name">
+      <g v-for="(n, i) in nodes" :key="n.name">
         <circle :cx="n.x" :cy="n.y" :r="R" stroke-width="2" class="fill-paper stroke-ink" />
+        <circle v-if="mass?.[i]" :cx="n.x" :cy="n.y" :r="R - 1" class="fade fill-signal" :style="{ opacity: 0.45 * approx(mass[i]) }" />
         <text :x="n.x" :y="n.y + 5" text-anchor="middle" class="fill-ink font-mono text-sm font-medium">{{ n.name }}</text>
       </g>
     </svg>

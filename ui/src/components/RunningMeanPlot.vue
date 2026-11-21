@@ -4,7 +4,8 @@ import Frac from "./Frac.vue";
 import type { ChainRun, Fraction } from "../engine/types";
 import { approx, count, fractionText } from "../format";
 
-const props = defineProps<{ run: ChainRun; epsilon: Fraction }>();
+// `reveal` in [0, 1] is how far through the samples the replay has got.
+const props = defineProps<{ run: ChainRun; epsilon: Fraction; reveal: number }>();
 
 const W = 640;
 const H = 240;
@@ -24,7 +25,8 @@ const view = computed(() => {
   const hi = centre + half;
   const x = (k: number): number => M.l + ((W - M.l - M.r) * k) / n;
   const y = (v: number): number => H - M.b - ((H - M.t - M.b) * (Math.min(hi, Math.max(lo, v)) - lo)) / (hi - lo);
-  const line = pts.map((p, i) => `${i === 0 ? "M" : "L"} ${x(p.samples)} ${y(p.approx)}`).join(" ");
+  const drawn = pts.slice(0, Math.max(1, Math.ceil(props.reveal * pts.length)));
+  const line = drawn.map((p, i) => `${i === 0 ? "M" : "L"} ${x(p.samples)} ${y(p.approx)}`).join(" ");
   return { n, x, y, line, centre, eps };
 });
 </script>

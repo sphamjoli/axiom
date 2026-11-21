@@ -2,7 +2,8 @@
 import { computed } from "vue";
 import type { ChainRun } from "../engine/types";
 
-const props = defineProps<{ run: ChainRun }>();
+// `reveal` in [0, 1] is how much of each path the replay has drawn.
+const props = defineProps<{ run: ChainRun; reveal: number }>();
 
 // One thin strip per path: small multiples share the step axis, and each
 // state sits on its own level, the first state at the top.
@@ -17,7 +18,8 @@ const view = computed(() => {
   const level = (s: number): number => (states > 1 ? (ROW - 12) * (s / (states - 1)) : 0) + 4;
   const rows = props.run.paths.map((path, i) => {
     const top = M.t + i * ROW;
-    const d = path
+    const drawn = path.slice(0, Math.max(1, Math.ceil(props.reveal * (path.length - 1)) + 1));
+    const d = drawn
       .map((s, t) => {
         const y = top + level(s);
         return t === 0 ? `M ${x(0)} ${y}` : `H ${x(t)} V ${y}`;

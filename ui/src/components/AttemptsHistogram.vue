@@ -4,7 +4,8 @@ import Frac from "./Frac.vue";
 import type { RetryRun } from "../engine/types";
 import { count, fractionText } from "../format";
 
-const props = defineProps<{ run: RetryRun }>();
+// `reveal` in [0, 1] grows the bars from the axis as the replay runs.
+const props = defineProps<{ run: RetryRun; reveal: number }>();
 
 const W = 640;
 const H = 240;
@@ -31,9 +32,9 @@ const view = computed(() => {
     <svg :viewBox="`0 0 ${W} ${H}`" class="h-auto w-full" role="img" aria-label="Histogram of attempts until success">
       <line :x1="M.l" :x2="M.l" :y1="M.t" :y2="H - M.b" class="stroke-rule" />
       <line :x1="M.l" :x2="W - M.r" :y1="H - M.b" :y2="H - M.b" class="stroke-rule" />
-      <rect v-for="b in view.bars" :key="b.attempts" :x="b.x" :width="b.w" :y="b.y" :height="H - M.b - b.y" class="fill-signal/70">
+      <g :transform="`translate(0 ${H - M.b}) scale(1 ${reveal}) translate(0 ${-(H - M.b)})`"><rect v-for="b in view.bars" :key="b.attempts" :x="b.x" :width="b.w" :y="b.y" :height="H - M.b - b.y" class="fill-signal/70">
         <title>{{ b.attempts }} attempts: {{ count(b.count) }} runs</title>
-      </rect>
+      </rect></g>
       <g v-if="view.inside(run.expectedApprox) && run.expectedAttempts">
         <line :x1="view.x(run.expectedApprox)" :x2="view.x(run.expectedApprox)" :y1="M.t - 6" :y2="H - M.b" stroke-dasharray="4 3" stroke-width="1.5" class="stroke-ink" />
         <text :x="view.x(run.expectedApprox) + 6" :y="M.t + 4" class="fill-ink font-mono text-[11px]">exact {{ fractionText(run.expectedAttempts) }}</text>

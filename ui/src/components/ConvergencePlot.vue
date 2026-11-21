@@ -1,9 +1,16 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import Frac from "./Frac.vue";
+import PlaybackControls from "./PlaybackControls.vue";
 import type { Convergence } from "../engine/types";
+import { modelClock as clock } from "../playback";
 
 const props = defineProps<{ data: Convergence }>();
+
+// The series drawn so far, d_0 to d_t, on the shared playback clock.
+const shown = computed(() => props.data.series.filter((p) => p.t <= clock.t.value));
+const current = computed(() => shown.value[shown.value.length - 1] ?? props.data.series[0]);
+const inBand = computed(() => props.data.horizon !== null && clock.t.value >= props.data.horizon);
 
 const W = 880;
 const H = 280;
@@ -24,7 +31,7 @@ const view = computed(() => {
   // The band is far thinner than a pixel at this scale, so draw it at least 4px tall.
   const bandTop = Math.min(y(fixed + eps), y(fixed) - 2);
   const bandBottom = Math.max(y(fixed - eps), y(fixed) + 2);
-  const line = pts.map((p, i) => `${i === 0 ? "M" : "L"} ${x(p.t)} ${y(p.approx)}`).join(" ");
+  const line = shown.value.map((p, i) => `${i === 0 ? "M" : "L"} ${x(p.t)} ${y(p.approx)}`).join(" ");
   const xTicks = Array.from({ length: Math.floor(tMax / 5) + 1 }, (_, i) => i * 5);
   return { x, y, line, fixed, bandTop, bandBottom, xTicks, tMax };
 });
@@ -33,12 +40,16 @@ const view = computed(() => {
 <template>
   <section class="panel">
     <div class="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-      <h2 class="panel-title mb-0">Convergence of P({{ data.state }})</h2>
+      <h2 class="panel-title mb-0">2. Run it: convergence of P({{ data.state }})</h2>
       <p class="text-sm text-ink-muted">
         d<sub>t+1</sub> = <Frac :value="data.a" /> d<sub>t</sub> + <Frac :value="data.b" />, d<sub>0</sub> = <Frac :value="data.initial" />
       </p>
     </div>
-    <div class="overflow-x-auto"><svg :viewBox="`0 0 ${W} ${H}`" class="h-auto w-full min-w-[600px]" role="img" aria-label="Convergence plot">
+    <PlaybackControls :clock="clock" class="mb-3">
+      t = <span class="tabular-nums">{{ clock.t.value }}</span>, d<sub>t</sub> = <Frac v-if="current" :value="current.value" />
+      <span v-if="inBand" class="text-proven"> · inside the 1/1000 band</span>
+    </PlaybackControls>
+    <div class="overflow-x-auto"><svg :viewBox="`0 0 ${W} ${H}`" class="h-auto w-full" role="img" aria-label="Convergence plot">
       <line :x1="M.l" :x2="M.l" :y1="M.t" :y2="H - M.b" class="stroke-rule" />
       <line :x1="M.l" :x2="W - M.r" :y1="H - M.b" :y2="H - M.b" class="stroke-rule" />
       <g v-for="t in view.xTicks" :key="t">
@@ -46,18 +57,18 @@ const view = computed(() => {
       </g>
       <text :x="M.l - 8" :y="view.y(1) + 4" text-anchor="end" class="fill-ink-muted font-mono text-[11px]">1</text>
       <text :x="M.l - 8" :y="view.y(0) + 4" text-anchor="end" class="fill-ink-muted font-mono text-[11px]">0</text>
-      <rect :x="M.l" :width="W - M.l - M.r" :y="view.bandTop" :height="view.bandBottom - view.bandTop" class="fill-signal/15" />
+      <rect :x="M.l" :width="W - M.l - M.r" :y="view.bandTop" :height="view.bandBottom - view.bandTop" class="band" :class="inBand ? 'fill-proven/25' : 'fill-signal/15'" />
       <line :x1="M.l" :x2="W - M.r" :y1="view.y(view.fixed)" :y2="view.y(view.fixed)" stroke-dasharray="4 4" class="stroke-ink-muted" />
       <text :x="M.l - 8" :y="view.y(view.fixed) + 4" text-anchor="end" class="fill-ink-muted font-mono text-[11px]">{{ data.fixedPoint.num }}/{{ data.fixedPoint.den }}</text>
       <text :x="W - M.r" :y="view.bandTop - 5" text-anchor="end" class="fill-ink-muted font-mono text-[11px]">band {{ data.fixedPoint.num }}/{{ data.fixedPoint.den }} &#177; {{ data.epsilon.num }}/{{ data.epsilon.den }}</text>
       <text :x="(M.l + W - M.r) / 2" :y="H - 6" text-anchor="middle" class="fill-ink-muted text-[12px]">step t</text>
       <text :x="14" :y="(M.t + H - M.b) / 2" text-anchor="middle" :transform="`rotate(-90 14 ${(M.t + H - M.b) / 2})`" class="fill-ink-muted text-[12px]">P({{ data.state }}) at step t</text>
-      <g v-if="data.horizon !== null">
+      <g v-if="data.horizon !== null" class="fade" :style="{ opacity: inBand ? 1 : 0.35 }">
         <line :x1="view.x(data.horizon)" :x2="view.x(data.horizon)" :y1="M.t" :y2="H - M.b" stroke-dasharray="3 3" class="stroke-ink-muted" />
         <text :x="view.x(data.horizon) + 6" :y="M.t + 12" class="fill-ink font-mono text-[12px]" :text-anchor="view.x(data.horizon) > W * 0.6 ? 'end' : 'start'" :dx="view.x(data.horizon) > W * 0.6 ? -12 : 0">t = {{ data.horizon }}, within 1/1000 from here</text>
       </g>
       <path :d="view.line" fill="none" stroke-width="2.25" class="stroke-signal" />
-      <circle v-for="p in data.series" :key="p.t" :cx="view.x(p.t)" :cy="view.y(p.approx)" r="2.5" class="fill-signal">
+      <circle v-for="p in shown" :key="p.t" :cx="view.x(p.t)" :cy="view.y(p.approx)" r="2.5" class="fill-signal">
         <title>t = {{ p.t }}: {{ p.value.num }}/{{ p.value.den }}</title>
       </circle>
     </svg></div>
