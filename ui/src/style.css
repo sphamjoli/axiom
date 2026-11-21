@@ -118,3 +118,8 @@
     transition: none;
   }
 }
+
+/* Results from the last valid model while the editor holds an error. */
+.is-stale {
+  opacity: 0.45;
+}

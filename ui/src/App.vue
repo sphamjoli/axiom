@@ -23,6 +23,9 @@ const sharedRun = decodeRun(window.location.hash);
 const source = ref(sharedRun?.model ?? TEMPLATES[0]?.source ?? "");
 const analysis = shallowRef<Analysis | null>(null);
 const diagnostics = ref<Diagnostic[]>([]);
+// True while the editor holds a model with errors: the results on the page
+// are then from the last valid model, so they are dimmed and cannot be used.
+const stale = ref(false);
 
 // Analysis runs once on load, then 150 ms after the last keystroke, so typing
 // does not queue an analysis per character. Only the newest run may update
@@ -42,8 +45,10 @@ async function runAnalysis(text: string): Promise<void> {
     const series = result.analysis.convergence?.series;
     if (series) clock.restart(series.length - 1);
     diagnostics.value = [];
+    stale.value = false;
   } else {
     diagnostics.value = result.diagnostics;
+    stale.value = analysis.value !== null;
   }
 }
 
@@ -106,15 +111,18 @@ watchEffect(() => document.documentElement.classList.toggle("dark", dark.value))
     <main class="mx-auto grid grid-cols-[minmax(0,1fr)] max-w-6xl gap-4 px-4 py-5 lg:grid-cols-2">
       <ModelGuide v-if="guideOpen" :engine="engine" @load="loadFromGuide" @close="guideOpen = false" />
       <ModelEditor v-model="source" :diagnostics="diagnostics" />
-      <ModelControls :analysis="analysis" @source="load" />
-      <TransitionGraph v-if="analysis?.chain" :chain="analysis.chain" :mass="mass" :step="clock.t.value" />
-      <section v-if="analysis?.notice" class="panel">
+      <p v-if="stale" class="panel text-sm text-rejected lg:col-span-2" role="status">
+        The model has an error, so the results below are from the last valid model and cannot be used. Fix the error to update them.
+      </p>
+      <ModelControls :class="{ 'is-stale': stale }" :inert="stale" :analysis="analysis" @source="load" />
+      <TransitionGraph :class="{ 'is-stale': stale }" :inert="stale" v-if="analysis?.chain" :chain="analysis.chain" :mass="mass" :step="clock.t.value" />
+      <section v-if="analysis?.notice" class="panel" :class="{ 'is-stale': stale }" :inert="stale">
         <h2 class="panel-title">Model {{ analysis.name }}</h2>
         <p class="text-sm text-ink-muted">{{ analysis.notice }}</p>
       </section>
-      <ConvergencePlot v-if="analysis?.convergence" id="convergence" :data="analysis.convergence" />
-      <CertificatePanel v-if="analysis?.certificate" :certificate="analysis.certificate" />
-      <section v-if="analysis?.retry" class="panel">
+      <ConvergencePlot :class="{ 'is-stale': stale }" :inert="stale" v-if="analysis?.convergence" id="convergence" :data="analysis.convergence" />
+      <CertificatePanel :class="{ 'is-stale': stale }" :inert="stale" v-if="analysis?.certificate" :certificate="analysis.certificate" />
+      <section v-if="analysis?.retry" class="panel" :class="{ 'is-stale': stale }" :inert="stale">
         <h2 class="panel-title">Retry until success</h2>
         <dl class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
           <dt class="text-ink-muted">Success per attempt</dt>
@@ -130,6 +138,8 @@ watchEffect(() => document.documentElement.classList.toggle("dark", dark.value))
       </section>
       <SimulatePanel
         v-if="analysis?.chain || analysis?.retry"
+        :class="{ 'is-stale': stale }"
+        :inert="stale"
         :engine="engine"
         :source="source"
         :analysis="analysis"
