@@ -22,6 +22,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "axiom-cli"
+version = "0.1.0"
+dependencies = [
+ "axiom-cert",
+ "axiom-model",
+ "thiserror",
+]
+
+[[package]]
 name = "axiom-core"
 version = "0.1.0"
 dependencies = [
