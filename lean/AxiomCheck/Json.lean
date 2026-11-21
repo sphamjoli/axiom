@@ -23,9 +23,8 @@ namespace AxiomCheck.Json
 inductive Value where
   /-- A string, with escape sequences decoded. -/
   | str (text : String)
-  /-- A non-negative integer and the number of decimal digits it was written
-  with. -/
-  | nat (value : Nat) (digits : Nat)
+  /-- A non-negative integer. -/
+  | nat (value : Nat)
   /-- An array, in order. -/
   | arr (items : List Value)
   /-- An object's members, in order, with repeated keys kept. -/
@@ -42,7 +41,8 @@ structure Error where
   deriving Repr
 
 /-- The deepest nesting of arrays and objects the reader accepts. A
-certificate needs four levels. -/
+certificate needs five levels: the root, the model, the rows, a row and a
+fraction. -/
 def maxDepth : Nat := 8
 
 /-- The most members an object may have. A certificate's largest object has
@@ -156,7 +156,7 @@ def readInteger (input : Array Char) (i : Nat) : Except Error (Value × Nat) :=
     | some '.' | some 'e' | some 'E' => throw ⟨next, "only plain integers are allowed"⟩
     | _ =>
       let value := digits.foldl (fun total d => total * 10 + (d.toNat - '0'.toNat)) 0
-      pure (.nat value count, next)
+      pure (.nat value, next)
 where
   /-- Collects consecutive digits, using `fuel` to bound the number of
   steps. -/
