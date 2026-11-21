@@ -7,16 +7,16 @@ import ModelControls from "./components/ModelControls.vue";
 import ModelEditor from "./components/ModelEditor.vue";
 import SimulatePanel from "./components/SimulatePanel.vue";
 import TransitionGraph from "./components/TransitionGraph.vue";
-import { LINKS_MODEL } from "./engine/models";
 import type { Analysis, Diagnostic, Engine, Fraction } from "./engine/types";
 import { complement } from "./format";
-import { PRESETS } from "./modelText";
+import ModelGuide from "./components/ModelGuide.vue";
+import { TEMPLATES } from "./models/templates";
 import { modelClock as clock } from "./playback";
 import { wasmEngine } from "./engine/wasm";
 
 const engine: Engine = wasmEngine;
 
-const source = ref(LINKS_MODEL);
+const source = ref(TEMPLATES[0]?.source ?? "");
 const analysis = shallowRef<Analysis | null>(null);
 const diagnostics = ref<Diagnostic[]>([]);
 
@@ -59,8 +59,17 @@ const mass = computed<Fraction[] | null>(() => {
   return point ? [complement(point.value), point.value] : null;
 });
 
+const PRESETS = TEMPLATES.filter((t) => t.preset !== null);
+const guideOpen = ref(false);
+
 function load(text: string): void {
   source.value = text;
+}
+
+// Loading from the guide also brings the editor into view.
+function loadFromGuide(text: string): void {
+  load(text);
+  document.getElementById("model-source")?.focus();
 }
 
 const dark = ref(window.matchMedia("(prefers-color-scheme: dark)").matches);
@@ -84,10 +93,14 @@ watchEffect(() => document.documentElement.classList.toggle("dark", dark.value))
       </ol>
       <div class="mt-4 flex flex-wrap items-center gap-2 text-sm" role="group" aria-label="Example models">
         <span class="text-ink-muted">Load an example:</span>
-        <button v-for="p in PRESETS" :key="p.label" class="btn" type="button" :aria-pressed="source === p.source" @click="load(p.source)">{{ p.label }}</button>
+        <button v-for="p in PRESETS" :key="p.id" class="btn" type="button" :aria-pressed="source === p.source" @click="load(p.source)">{{ p.preset }}</button>
+        <button class="btn btn-primary" type="button" :aria-expanded="guideOpen" aria-controls="guide" @click="guideOpen = !guideOpen">
+          {{ guideOpen ? "Hide how to write a model" : "How to write a model" }}
+        </button>
       </div>
     </div>
-    <main class="mx-auto grid max-w-6xl gap-4 px-4 py-5 lg:grid-cols-2">
+    <main class="mx-auto grid grid-cols-[minmax(0,1fr)] max-w-6xl gap-4 px-4 py-5 lg:grid-cols-2">
+      <ModelGuide v-if="guideOpen" :engine="engine" @load="loadFromGuide" @close="guideOpen = false" />
       <ModelEditor v-model="source" :diagnostics="diagnostics" />
       <ModelControls :analysis="analysis" @source="load" />
       <TransitionGraph v-if="analysis?.chain" :chain="analysis.chain" :mass="mass" :step="clock.t.value" />

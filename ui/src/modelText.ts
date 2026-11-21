@@ -65,17 +65,3 @@ export function retryText(name: string, success: Fraction): string {
 }
 `;
 }
-
-export interface Preset {
-  label: string;
-  source: string;
-}
-
-const LINKS: [string, string] = ["up", "down"];
-
-export const PRESETS: Preset[] = [
-  { label: "Alice's links: settles at 1/4", source: twoStateText("links", LINKS, reduce(1n, 10n), reduce(3n, 10n)) },
-  { label: "Slow repair: settles at 1/2, slowly", source: twoStateText("links", LINKS, reduce(1n, 10n), reduce(1n, 10n)) },
-  { label: "Flips every step: never settles", source: twoStateText("flip", LINKS, reduce(1n, 1n), reduce(1n, 1n)) },
-  { label: "Retry 3/10: 10/3 attempts expected", source: retryText("request", reduce(3n, 10n)) },
-];

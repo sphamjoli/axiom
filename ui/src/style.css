@@ -82,6 +82,9 @@
   .step-n {
     @apply inline-flex size-5 shrink-0 items-center justify-center rounded-full border border-signal font-mono text-xs text-signal;
   }
+  .code {
+    @apply overflow-x-auto rounded-md border border-rule bg-paper px-3 py-2 font-mono text-xs text-ink select-text;
+  }
   .range {
     accent-color: var(--signal);
   }
