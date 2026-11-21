@@ -1,4 +1,4 @@
-.PHONY: engine-subset engine-install engine-translate engine-check rust-test-without-lean cli-lean-test cli-demo ui-check lean-test rust-deny help hooks-install check fmt rust-fmt rust-lint rust-test rust-doc lean-build lean-check lean-cache lean-audit
+.PHONY: demo engine-subset engine-install engine-translate engine-check rust-test-without-lean cli-lean-test cli-demo ui-check lean-test rust-deny help hooks-install check fmt rust-fmt rust-lint rust-test rust-doc lean-build lean-check lean-cache lean-audit
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | sed 's/:.*## /\t/'
@@ -60,6 +60,9 @@ engine-translate: ## Fail unless Charon and Aeneas regenerate the committed Lean
 engine-check: ## Build the proof 3 Lean project and audit its axioms
 	cd lean-engine && lake exe cache get
 	./scripts/checkEngine.sh
+
+demo: ## Run the end-to-end demo: Alice analyses, Bob checks every claim, negatives are rejected (requires lake)
+	./scripts/demo.sh
 
 cli-demo: ## Write the golden certificate from links.axm and check it with the Lean checker
 	cargo run -q -p axiom-cli -- analyse fixtures/models/links.axm --cert target/links-mass.json
