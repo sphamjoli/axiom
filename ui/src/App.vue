@@ -1,13 +1,17 @@
 <script setup lang="ts">
-import { onBeforeUnmount, ref, shallowRef, watch, watchEffect } from "vue";
+import { computed, onBeforeUnmount, ref, shallowRef, watch, watchEffect } from "vue";
 import CertificatePanel from "./components/CertificatePanel.vue";
 import ConvergencePlot from "./components/ConvergencePlot.vue";
 import Frac from "./components/Frac.vue";
+import ModelControls from "./components/ModelControls.vue";
 import ModelEditor from "./components/ModelEditor.vue";
 import SimulatePanel from "./components/SimulatePanel.vue";
 import TransitionGraph from "./components/TransitionGraph.vue";
 import { LINKS_MODEL } from "./engine/models";
-import type { Analysis, Diagnostic, Engine } from "./engine/types";
+import type { Analysis, Diagnostic, Engine, Fraction } from "./engine/types";
+import { complement } from "./format";
+import { PRESETS } from "./modelText";
+import { modelClock as clock } from "./playback";
 import { wasmEngine } from "./engine/wasm";
 
 const engine: Engine = wasmEngine;
@@ -30,6 +34,9 @@ async function runAnalysis(text: string): Promise<void> {
   if (run !== latestRun) return;
   if (result.ok) {
     analysis.value = result.analysis;
+    // Every new model plays its convergence once from t = 0, then waits.
+    const series = result.analysis.convergence?.series;
+    if (series) clock.restart(series.length - 1);
     diagnostics.value = [];
   } else {
     diagnostics.value = result.diagnostics;
@@ -43,6 +50,19 @@ watch(source, (text) => {
 onBeforeUnmount(() => clearTimeout(pending));
 void runAnalysis(source.value);
 
+// The probability of each state at the clock's step: the series tracks the
+// second state, so the first holds the rest.
+const mass = computed<Fraction[] | null>(() => {
+  const convergence = analysis.value?.convergence;
+  if (!convergence) return null;
+  const point = convergence.series.find((p) => p.t === clock.t.value) ?? convergence.series[0];
+  return point ? [complement(point.value), point.value] : null;
+});
+
+function load(text: string): void {
+  source.value = text;
+}
+
 const dark = ref(window.matchMedia("(prefers-color-scheme: dark)").matches);
 watchEffect(() => document.documentElement.classList.toggle("dark", dark.value));
 </script>
@@ -55,14 +75,27 @@ watchEffect(() => document.documentElement.classList.toggle("dark", dark.value))
         <button class="btn" type="button" :aria-pressed="dark" @click="dark = !dark">Use {{ dark ? "light" : "dark" }} theme</button>
       </div>
     </header>
+    <div class="mx-auto max-w-6xl px-4 pt-5">
+      <p class="text-base text-ink">Write a model, watch it run, and get a certificate the Lean checker can verify.</p>
+      <ol class="mt-3 grid gap-2 text-sm sm:grid-cols-3">
+        <li><a class="step" href="#model-source"><span class="step-n">1</span><span>Edit the model, or move the probabilities</span></a></li>
+        <li><a class="step" href="#convergence"><span class="step-n">2</span><span>Run it: play the convergence and simulate</span></a></li>
+        <li><a class="step" href="#certificate"><span class="step-n">3</span><span>Save the certificate and run <code class="font-mono">axiom check</code> on it</span></a></li>
+      </ol>
+      <div class="mt-4 flex flex-wrap items-center gap-2 text-sm" role="group" aria-label="Example models">
+        <span class="text-ink-muted">Load an example:</span>
+        <button v-for="p in PRESETS" :key="p.label" class="btn" type="button" :aria-pressed="source === p.source" @click="load(p.source)">{{ p.label }}</button>
+      </div>
+    </div>
     <main class="mx-auto grid max-w-6xl gap-4 px-4 py-5 lg:grid-cols-2">
       <ModelEditor v-model="source" :diagnostics="diagnostics" />
-      <TransitionGraph v-if="analysis?.chain" :chain="analysis.chain" />
+      <ModelControls :analysis="analysis" @source="load" />
+      <TransitionGraph v-if="analysis?.chain" :chain="analysis.chain" :mass="mass" :step="clock.t.value" />
       <section v-if="analysis?.notice" class="panel">
         <h2 class="panel-title">Model {{ analysis.name }}</h2>
         <p class="text-sm text-ink-muted">{{ analysis.notice }}</p>
       </section>
-      <ConvergencePlot v-if="analysis?.convergence" :data="analysis.convergence" class="lg:col-span-2" />
+      <ConvergencePlot v-if="analysis?.convergence" id="convergence" :data="analysis.convergence" />
       <CertificatePanel v-if="analysis?.certificate" :certificate="analysis.certificate" />
       <section v-if="analysis?.retry" class="panel">
         <h2 class="panel-title">Retry until success</h2>

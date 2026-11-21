@@ -7,7 +7,7 @@ defineProps<{ diagnostics: Diagnostic[] }>();
 
 <template>
   <section class="panel flex flex-col">
-    <label for="model-source" class="panel-title">Model source</label>
+    <label for="model-source" class="panel-title">1. Edit the model</label>
     <textarea
       id="model-source"
       v-model="model"

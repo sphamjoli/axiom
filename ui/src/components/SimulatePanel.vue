@@ -7,6 +7,7 @@ import SamplePaths from "./SamplePaths.vue";
 import StatusBadge from "./StatusBadge.vue";
 import { SIM_CAPS, type Engine, type Simulation, type SimulationError } from "../engine/types";
 import { complement, count } from "../format";
+import { createClock } from "../playback";
 
 const props = defineProps<{ engine: Engine; source: string; kind: "chain" | "retry" }>();
 
@@ -24,6 +25,12 @@ const running = ref(false);
 const result = shallowRef<Simulation | null>(null);
 const failure = shallowRef<SimulationError | null>(null);
 const copied = ref(false);
+
+// A finished run is replayed in 20 frames on the page's playback speed:
+// paths draw, the running fraction advances and the bars grow.
+const REPLAY_FRAMES = 20;
+const replay = createClock();
+const reveal = computed(() => (replay.last.value === 0 ? 1 : replay.t.value / replay.last.value));
 
 function newSeed(): void {
   const draw = new BigUint64Array(1);
@@ -64,6 +71,7 @@ async function run(): Promise<void> {
   if (outcome.ok) {
     result.value = outcome.simulation;
     failure.value = null;
+    replay.restart(REPLAY_FRAMES);
   } else {
     result.value = null;
     failure.value = outcome.error;
@@ -87,15 +95,15 @@ const estimateSubject = computed(() => {
 </script>
 
 <template>
-  <section class="panel" aria-labelledby="simulate-title">
+  <section id="simulate" class="panel" aria-labelledby="simulate-title">
     <div class="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-      <h2 id="simulate-title" class="panel-title mb-0">Simulate</h2>
+      <h2 id="simulate-title" class="panel-title mb-0">2. Run it: simulate</h2>
       <p class="text-sm text-ink-muted">Seeded sampling in the browser. The same seed draws the same picture.</p>
     </div>
 
     <form class="grid gap-3 sm:grid-cols-[minmax(0,1.6fr)_repeat(2,minmax(0,1fr))] sm:items-end" @submit.prevent="run">
       <label class="field">
-        <span>Seed</span>
+        <span>Seed <span class="text-xs">· same seed, same run</span></span>
         <span class="flex gap-2">
           <input v-model.trim="seed" class="input min-w-0 flex-1" inputmode="numeric" autocomplete="off" spellcheck="false" maxlength="20" :aria-invalid="!seedValid" aria-describedby="seed-help" />
           <button class="btn shrink-0" type="button" @click="newSeed">New seed</button>
@@ -103,7 +111,7 @@ const estimateSubject = computed(() => {
         <span v-if="!seedValid" id="seed-help" class="text-xs text-rejected">A whole number from 0 to 18446744073709551615.</span>
       </label>
       <label class="field">
-        <span>Samples</span>
+        <span>Samples <span class="text-xs">· more samples, tighter estimate</span></span>
         <input v-model.number="samples" class="input" type="number" min="1" :max="SIM_CAPS.samples" step="1" :aria-invalid="!samplesValid" />
         <span v-if="!samplesValid" class="text-xs text-rejected">From 1 to {{ count(SIM_CAPS.samples) }}.</span>
       </label>
@@ -155,10 +163,10 @@ const estimateSubject = computed(() => {
       </div>
 
       <template v-if="result.chain">
-        <SamplePaths :run="result.chain" />
-        <RunningMeanPlot :run="result.chain" :epsilon="result.epsilon" />
+        <SamplePaths :run="result.chain" :reveal="reveal" />
+        <RunningMeanPlot :run="result.chain" :epsilon="result.epsilon" :reveal="reveal" />
       </template>
-      <AttemptsHistogram v-if="result.retry" :run="result.retry" />
+      <AttemptsHistogram v-if="result.retry" :run="result.retry" :reveal="reveal" />
     </div>
   </section>
 </template>
