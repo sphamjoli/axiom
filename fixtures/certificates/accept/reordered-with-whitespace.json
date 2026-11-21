@@ -1,0 +1,3 @@
+
+	{ "claims" : [ { "row" : 0 , "kind" : "Mass" } ] ,
+  "model" : { "rows" : [ [ {"num":"1","den":"2"} , {"num":"1","den":"2"} ] , [ {"num":"1","den":"2"} , {"num":"1","den":"2"} ] ] } , "version" : 1 , "format" : "axiom-certificate" }
