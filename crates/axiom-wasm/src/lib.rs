@@ -7,6 +7,10 @@
 //! diagnostics with a line and a column, and their messages never quote the
 //! source.
 //!
+//! [`simulate`] runs seeded simulations of a model with `axiom-sim` and
+//! returns sample paths, running fractions, histograms and a Hoeffding
+//! estimate, bounded by the caps in this crate's constants.
+//!
 //! The certificate is the one `axiom analyse` writes, but the browser does
 //! not run the Lean checker, so every claim is reported as unchecked.
 //!
@@ -24,13 +28,20 @@ use num_traits::{One, Signed, ToPrimitive, Zero};
 use serde::Serialize;
 use wasm_bindgen::prelude::wasm_bindgen;
 
+mod simulation;
+
+pub use simulation::{
+    MAX_ATTEMPTS, MAX_HISTOGRAM_BUCKETS, MAX_PATH_STEPS, MAX_REQUEST_BYTES, MAX_RUNNING_POINTS,
+    MAX_SAMPLES, MAX_SOURCE_BYTES, MAX_STEPS, PATHS, RequestError,
+};
+
 /// The distance from the steady state the convergence horizon is measured
 /// against: 1/1000.
 const TOLERANCE_DENOMINATOR: u32 = 1000;
 
 /// The most steps of the convergence series, so a slowly contracting chain
 /// cannot make the analysis run for long.
-const MAX_STEPS: usize = 200;
+const MAX_SERIES_STEPS: usize = 200;
 
 /// How many steps past the horizon the series continues, to show it settle.
 const STEPS_AFTER_HORIZON: usize = 7;
@@ -57,6 +68,30 @@ pub fn analyse(source: &str) -> String {
             r#"{"ok":false,"diagnostics":[{"line":1,"column":1,"code":"internal","message":"the engine could not encode its result"}]}"#,
         )
     })
+}
+
+/// Simulates the model in `source` as `request_json` asks and returns the
+/// result as JSON.
+///
+/// The request is `{"seed": "<u64 in decimal>", "samples": n, "steps": s,
+/// "maxAttempts": m}` with optional `"epsilon"` and `"delta"` fractions such
+/// as `{"num": "1", "den": "100"}`, which default to 1/100 and 1/1000. The
+/// seed is a string because a JavaScript number cannot hold every `u64`.
+/// The result is `{"ok": true, "simulation": ...}`, or `{"ok": false,
+/// "error": {"code", "message", "line", "column"}}` with a stable code and a
+/// fixed message that never repeats the request or the model.
+///
+/// ```
+/// let json = axiom_wasm::simulate(
+///     "retry request {\n  success 3/10\n}\n",
+///     r#"{"seed": "7", "samples": 100, "steps": 10, "maxAttempts": 50}"#,
+/// );
+/// assert!(json.starts_with(r#"{"ok":true"#));
+/// ```
+#[wasm_bindgen]
+#[must_use]
+pub fn simulate(source: &str, request_json: &str) -> String {
+    simulation::simulate(source, request_json)
 }
 
 /// The outcome of [`analyse`].
@@ -293,7 +328,7 @@ fn convergence(states: &[String], matrix: &TransitionMatrix) -> Option<Convergen
     let mut horizon = None;
     for (t, value) in update
         .iterate(initial.clone())
-        .take(MAX_STEPS + 1)
+        .take(MAX_SERIES_STEPS + 1)
         .enumerate()
     {
         // With |lambda| < 1 the distance to the fixed point never grows, so
