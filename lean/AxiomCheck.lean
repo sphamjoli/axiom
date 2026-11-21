@@ -1,6 +1,7 @@
 import AxiomCheck.Certificate
 import AxiomCheck.Json
 import AxiomCheck.Parse
+import AxiomCheck.Semantics
 
 /-!
 # AxiomCheck
