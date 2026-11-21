@@ -104,6 +104,15 @@ fn link_model_needs_thirteen_steps_to_come_within_one_thousandth() -> Result<(),
 }
 
 #[test]
+fn a_distance_exactly_equal_to_the_tolerance_is_within_it() -> Result<(), TestError> {
+    // From d0 = 1 the distance to 1/4 after n steps is (3/5)^n * 3/4, which
+    // is exactly 27/100 at n = 2, so the bound is met at 2 steps, not 3.
+    let steps = link_chain()?.steps_within(&BigRational::one(), &ratio(27, 100), 10)?;
+    assert_eq!(steps, Some(2));
+    Ok(())
+}
+
+#[test]
 fn step_search_gives_up_at_its_limit() -> Result<(), TestError> {
     let steps = link_chain()?.steps_within(&BigRational::one(), &ratio(1, 1000), 12)?;
     assert_eq!(steps, None);

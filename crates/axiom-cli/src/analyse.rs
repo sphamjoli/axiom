@@ -89,7 +89,6 @@ pub fn run(model: &Path, cert: &Path) -> Result<Summary, CliError> {
     })
 }
 
-
 /// Reads a model file, refusing files larger than the model size limit
 /// without reading more than one byte past it.
 fn read_model(path: &Path) -> Result<String, CliError> {
