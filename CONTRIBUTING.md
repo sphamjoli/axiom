@@ -58,9 +58,10 @@ On some recent macOS versions the mathlib cache tool fails to start. `make lean-
 
 | Path | Contents |
 | --- | --- |
-| `Cargo.toml`, `crates/` | The Rust engine, a Cargo workspace. `crates/axiom-core` holds exact probabilities, transition rows, two-state chains and affine updates. `crates/axiom-cert` writes and reads certificates in the version 1 format. Each crate keeps its tests in its own `tests/` folder. |
+| `Cargo.toml`, `crates/` | The Rust engine, a Cargo workspace. `crates/axiom-core` holds exact probabilities, transition rows, two-state chains and affine updates. `crates/axiom-cert` writes and reads certificates in the version 1 format. `crates/axiom-model` reads `.axm` model files: it parses them and runs the static checks of the modelling language. Each crate keeps its tests in its own `tests/` folder. |
 | `lean/` | The Lean 4 project for the `AxiomCheck` checker, pinned to Lean v4.19.0 and mathlib v4.19.0. `AxiomCheck/Json.lean` is the strict JSON reader and `AxiomCheck/Parse.lean` the certificate reader; their tests are in `lean/AxiomCheckTest/`. `lean/scripts/AxiomAudit.lean` implements the axiom audit. |
 | `fixtures/certificates/` | Certificates shared by the engine's and the checker's tests: a golden file both must read, and rejection fixtures both must reject. |
+| `fixtures/models/` | Model files with hand-computed expected results in sibling `.expected.json` files, and in `reject/` faulty models, each with the fault and its line and column. |
 | `ui/` | The web interface, written in Vue 3 and TypeScript and built with Vite and Tailwind CSS. It talks to the engine through the `Engine` interface in `ui/src/engine/types.ts`; until the engine is compiled to WebAssembly, `ui/src/engine/mock.ts` stands in for it. |
 | `scripts/` | The checks run by the Git hooks and by CI. |
 | `.github/` | CI workflows, the pull request template, issue templates and label definitions. |
@@ -90,7 +91,7 @@ A hook whose script cannot find a JavaScript runtime skips instead of failing, s
 
 ## Commits
 
-Each commit message is a single line of the form `type(scope): subject`, with no body. The type is one of `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `ci`, `perf` and `revert`. The scope is optional and is one of `core`, `infer`, `circuit`, `cert`, `cli`, `lean`, `examples`, `docs`, `ci`, `deps` and `ui`. The subject starts with a letter and states what changed, for example `fix(cert): reject certificates whose rows do not sum to one`. Commits carry no co-author trailers.
+Each commit message is a single line of the form `type(scope): subject`, with no body. The type is one of `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `ci`, `perf` and `revert`. The scope is optional and is one of `core`, `infer`, `circuit`, `cert`, `model`, `cli`, `lean`, `examples`, `docs`, `ci`, `deps` and `ui`. The subject starts with a letter and states what changed, for example `fix(cert): reject certificates whose rows do not sum to one`. Commits carry no co-author trailers.
 
 Local planning notes belong in `.local/`, which Git ignores. They are never committed.
 
