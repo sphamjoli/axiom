@@ -41,7 +41,8 @@ impl Threshold {
 
 /// The cumulative thresholds of one row: entry `j` cuts at
 /// `⌈(p_0 + … + p_j) · 2^64⌉`, and the last entry is `2^64`.
-fn row_thresholds(row: &[Probability]) -> Vec<Threshold> {
+#[must_use]
+pub fn row_thresholds(row: &[Probability]) -> Vec<Threshold> {
     let mut sum = BigRational::from_integer(BigInt::from(0));
     let mut cuts = Vec::with_capacity(row.len());
     for probability in row {
@@ -53,8 +54,10 @@ fn row_thresholds(row: &[Probability]) -> Vec<Threshold> {
     cuts
 }
 
-/// The first state whose cumulative threshold admits `draw`.
-fn choose(cuts: &[Threshold], draw: u64) -> usize {
+/// The first state whose cumulative threshold admits `draw`: the next
+/// state for one draw against the cuts of [`row_thresholds`].
+#[must_use]
+pub fn choose(cuts: &[Threshold], draw: u64) -> usize {
     cuts.iter()
         .position(|cut| cut.admits(draw))
         .unwrap_or(cuts.len().saturating_sub(1))

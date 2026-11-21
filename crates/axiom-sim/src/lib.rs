@@ -36,6 +36,6 @@ pub use error::SimError;
 pub use hoeffding::{Certainty, Estimate, required_samples};
 pub use rng::SplitMix64;
 pub use sample::{
-    ChainSamples, RetrySamples, Threshold, chain_matrix, retry_probability, sample_chain,
-    sample_paths, sample_retry,
+    ChainSamples, RetrySamples, Threshold, chain_matrix, choose, retry_probability, row_thresholds,
+    sample_chain, sample_paths, sample_retry,
 };
