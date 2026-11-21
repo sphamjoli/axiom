@@ -29,11 +29,11 @@ mod hoeffding;
 mod rng;
 mod sample;
 
-pub use error::SimError;
-pub use hoeffding::{
-    Certainty, EXP_ARGUMENT_CAP, EXP_PRECISION_BITS, EXP_SERIES_TERMS, Estimate, exp_lower_bound,
-    hoeffding_holds, required_samples,
+pub use axiom_core::{
+    EXP_ARGUMENT_CAP, EXP_PRECISION_BITS, EXP_SERIES_TERMS, exp_lower_bound, hoeffding_holds,
 };
+pub use error::SimError;
+pub use hoeffding::{Certainty, Estimate, required_samples};
 pub use rng::SplitMix64;
 pub use sample::{
     ChainSamples, RetrySamples, Threshold, chain_matrix, retry_probability, sample_chain,
