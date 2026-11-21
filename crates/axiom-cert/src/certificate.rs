@@ -97,6 +97,28 @@ impl Certificate {
         Ok(certificate)
     }
 
+    /// The certificate with the most claims the engine can make about
+    /// `matrix`: for a two-state chain with a unique, attracting steady
+    /// state, the [`Certificate::two_state`] certificate; otherwise the
+    /// [`Certificate::mass`] certificate. For example, Alice's links chain
+    /// gets the steady state 1/4 and the contraction factor 3/5, while the
+    /// periodic chain that swaps its two states every step gets only `Mass`
+    /// claims, because it never settles.
+    #[must_use]
+    pub fn strongest(matrix: TransitionMatrix) -> Self {
+        if let [first, second] = matrix.rows()
+            && let (Some(leave_first), Some(leave_second)) =
+                (first.probabilities().get(1), second.probabilities().first())
+            && let Ok(certificate) = Self::two_state(&TwoStateChain::new(
+                leave_first.clone(),
+                leave_second.clone(),
+            ))
+        {
+            return certificate;
+        }
+        Self::mass(matrix)
+    }
+
     /// The format version the certificate is written in: the lowest version
     /// that can express every claim, so a certificate of `Mass` claims only
     /// is written as version 1.

@@ -6,7 +6,6 @@ use std::io::Read;
 use std::path::Path;
 
 use axiom_cert::Certificate;
-use axiom_core::{TransitionMatrix, TwoStateChain};
 use axiom_model::{CheckedModel, MAX_INPUT_BYTES};
 
 use crate::error::CliError;
@@ -54,7 +53,7 @@ pub fn run(model: &Path, cert: &Path) -> Result<Summary, CliError> {
             what: "parametric chains are not yet supported: no claim kind covers them",
         });
     };
-    let certificate = strongest_certificate(matrix);
+    let certificate = Certificate::strongest(matrix);
     let text = certificate.to_json()?;
     std::fs::write(cert, text).map_err(|source| CliError::Io {
         path: cert.to_path_buf(),
@@ -66,26 +65,6 @@ pub fn run(model: &Path, cert: &Path) -> Result<Summary, CliError> {
         claims: certificate.claims().len(),
         cert: cert.display().to_string(),
     })
-}
-
-/// The certificate with the most claims the engine can make about `matrix`:
-/// for a two-state chain with a unique, attracting steady state, the `Mass`
-/// claims plus `FixedPoint` and `Contraction`; otherwise the `Mass` claims
-/// alone. For example, Alice's links chain gets the steady state 1/4 and the
-/// contraction factor 3/5, while the periodic chain that swaps its two states
-/// every step gets only `Mass` claims, because it never settles.
-fn strongest_certificate(matrix: TransitionMatrix) -> Certificate {
-    if let [first, second] = matrix.rows()
-        && let (Some(leave_first), Some(leave_second)) =
-            (first.probabilities().get(1), second.probabilities().first())
-        && let Ok(certificate) = Certificate::two_state(&TwoStateChain::new(
-            leave_first.clone(),
-            leave_second.clone(),
-        ))
-    {
-        return certificate;
-    }
-    Certificate::mass(matrix)
 }
 
 /// Reads a model file, refusing files larger than the model size limit
