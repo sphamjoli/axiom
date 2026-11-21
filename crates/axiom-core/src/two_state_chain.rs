@@ -1,5 +1,5 @@
 use num_rational::BigRational;
-use num_traits::Zero;
+use num_traits::{Signed, Zero};
 use thiserror::Error;
 
 use crate::{AffineUpdate, Probability, TransitionMatrix, TransitionRow};
@@ -78,5 +78,38 @@ impl TwoStateChain {
         }
         Probability::try_new(&(self.leave_first.value() / total))
             .map_err(|_| TwoStateChainError::NoUniqueFixedPoint)
+    }
+
+    /// The least number of steps `n`, at most `limit`, after which the
+    /// distance from the steady state is certified to be within `tolerance`
+    /// for every later step: `|lambda|^n |start - d*| <= tolerance`, where
+    /// `lambda` is [`Self::contraction_factor`] and `d*` is
+    /// [`Self::steady_state`]. Returns `None` when no `n` up to `limit`
+    /// suffices, for example for the periodic chain, whose factor is `-1`,
+    /// unless `start` is already within `tolerance` of the steady state.
+    ///
+    /// The search multiplies exact rationals at most `limit` times, so the
+    /// caller bounds the cost by choosing `limit`. For the link model,
+    /// `start = 1` and `tolerance = 1/1000` give 13 steps.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TwoStateChainError::NoUniqueFixedPoint`] when `a + b = 0`.
+    pub fn steps_within(
+        &self,
+        start: &BigRational,
+        tolerance: &BigRational,
+        limit: u64,
+    ) -> Result<Option<u64>, TwoStateChainError> {
+        let steady = self.steady_state()?;
+        let factor = self.contraction_factor().abs();
+        let mut distance = (start - steady.value()).abs();
+        for steps in 0..=limit {
+            if distance <= *tolerance {
+                return Ok(Some(steps));
+            }
+            distance = &distance * &factor;
+        }
+        Ok(None)
     }
 }

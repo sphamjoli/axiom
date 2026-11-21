@@ -96,6 +96,56 @@ fn deviation_after_many_steps_is_exactly_geometric() -> Result<(), TestError> {
     Ok(())
 }
 
+#[test]
+fn link_model_needs_thirteen_steps_to_come_within_one_thousandth() -> Result<(), TestError> {
+    let steps = link_chain()?.steps_within(&BigRational::one(), &ratio(1, 1000), 10_000)?;
+    assert_eq!(steps, Some(13));
+    Ok(())
+}
+
+#[test]
+fn step_search_gives_up_at_its_limit() -> Result<(), TestError> {
+    let steps = link_chain()?.steps_within(&BigRational::one(), &ratio(1, 1000), 12)?;
+    assert_eq!(steps, None);
+    Ok(())
+}
+
+#[test]
+fn periodic_chain_alternates_and_never_comes_within_tolerance() -> Result<(), TestError> {
+    let chain = TwoStateChain::new(probability(1, 1)?, probability(1, 1)?);
+    let terms: Vec<BigRational> = chain
+        .second_state_update()
+        .iterate(BigRational::one())
+        .take(6)
+        .collect();
+    let one = BigRational::one();
+    let zero = BigRational::zero();
+    assert_eq!(
+        terms,
+        vec![
+            one.clone(),
+            zero.clone(),
+            one.clone(),
+            zero.clone(),
+            one,
+            zero
+        ]
+    );
+    let steps = chain.steps_within(&BigRational::one(), &ratio(1, 1000), 10_000)?;
+    assert_eq!(steps, None);
+    Ok(())
+}
+
+#[test]
+fn starting_at_the_steady_state_needs_no_steps() -> Result<(), TestError> {
+    let chain = TwoStateChain::new(probability(1, 1)?, probability(1, 1)?);
+    assert_eq!(
+        chain.steps_within(&ratio(1, 2), &ratio(1, 1000), 10)?,
+        Some(0)
+    );
+    Ok(())
+}
+
 fn any_probability() -> impl Strategy<Value = Probability> {
     (0_i64..=1_000, 1_i64..=1_000).prop_filter_map("fraction must not exceed one", |(n, d)| {
         Probability::try_from_fraction(n, d).ok()
