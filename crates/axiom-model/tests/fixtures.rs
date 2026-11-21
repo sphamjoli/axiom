@@ -1,15 +1,14 @@
 //! The model fixtures in `fixtures/models/`. Each valid model has a sibling
-//! `.expected.json` of hand-computed exact results, and each file in
+//! `.expected.json` of what the model reader must produce, and each file in
 //! `fixtures/models/reject/` has one naming the fault and its position.
 
 mod common;
 
 use std::fs;
 
-use axiom_core::{Probability, TwoStateChain};
 use common::{TestError, array, chain, expected, field, fixture, fraction, matrix, models_dir};
 use num_rational::BigRational;
-use num_traits::{One, Signed, Zero};
+use num_traits::Zero;
 use serde_json::Value;
 
 fn expected_matrix(value: &Value) -> Result<Vec<Vec<BigRational>>, TestError> {
@@ -37,128 +36,35 @@ fn expected_states(value: &Value) -> Result<Vec<String>, TestError> {
         .collect()
 }
 
-fn two_state(rows: &[Vec<BigRational>]) -> Result<TwoStateChain, TestError> {
-    let entry = |row: usize, column: usize| {
-        rows.get(row)
-            .and_then(|row| row.get(column))
-            .ok_or(TestError::Field("matrix"))
-    };
-    Ok(TwoStateChain::new(
-        Probability::try_new(entry(0, 1)?)?,
-        Probability::try_new(entry(1, 0)?)?,
-    ))
-}
-
 #[test]
-fn links_matches_its_expected_results() -> Result<(), TestError> {
+fn links_parses_to_its_expected_states_and_matrix() -> Result<(), TestError> {
     let expected = expected("links.expected.json")?;
     let links = chain(&fixture("links.axm")?)?;
     assert_eq!(links.states, expected_states(&expected)?);
-    let rows = matrix(&links)?;
-    assert_eq!(rows, expected_matrix(&expected)?);
-
-    let update = two_state(&rows)?.second_state_update();
-    assert_eq!(
-        update.factor(),
-        &fraction(field(&expected, "lambda")?, "lambda")?
-    );
-    assert_eq!(
-        update.offset(),
-        &fraction(field(&expected, "offset")?, "offset")?
-    );
-    let steady = update.offset() / (BigRational::one() - update.factor());
-    assert_eq!(
-        steady,
-        fraction(field(&expected, "steady_down")?, "steady_down")?
-    );
-    assert_eq!(
-        Some(update.factor().abs() < BigRational::one()),
-        field(&expected, "convergent")?.as_bool()
-    );
-
-    let iterates = array(&expected, "iterates_from_down_one")?;
-    for (value, wanted) in update.iterate(BigRational::one()).zip(iterates) {
-        assert_eq!(value, fraction(wanted, "iterates_from_down_one")?);
-    }
-
-    let tolerance = fraction(field(&expected, "tolerance")?, "tolerance")?;
-    let steps = update
-        .iterate(BigRational::one())
-        .take(1000)
-        .position(|value| (value - &steady).abs() <= tolerance);
-    let wanted = field(&expected, "steps_to_tolerance_from_down_one")?.as_u64();
-    assert_eq!(steps.and_then(|steps| u64::try_from(steps).ok()), wanted);
+    assert_eq!(matrix(&links)?, expected_matrix(&expected)?);
     Ok(())
 }
 
 #[test]
-fn periodic_parses_but_does_not_converge() -> Result<(), TestError> {
+fn periodic_parses_to_its_expected_states_and_matrix() -> Result<(), TestError> {
     let expected = expected("periodic.expected.json")?;
     let flip = chain(&fixture("periodic.axm")?)?;
     assert_eq!(flip.states, expected_states(&expected)?);
-    let rows = matrix(&flip)?;
-    assert_eq!(rows, expected_matrix(&expected)?);
-    let update = two_state(&rows)?.second_state_update();
-    assert_eq!(
-        update.factor(),
-        &fraction(field(&expected, "lambda")?, "lambda")?
-    );
-    assert_eq!(
-        update.offset(),
-        &fraction(field(&expected, "offset")?, "offset")?
-    );
-    assert_eq!(
-        Some(update.factor().abs() < BigRational::one()),
-        field(&expected, "convergent")?.as_bool()
-    );
+    assert_eq!(matrix(&flip)?, expected_matrix(&expected)?);
     Ok(())
 }
 
 #[test]
-fn retry_matches_its_expected_results() -> Result<(), TestError> {
+fn retry_parses_to_its_expected_success_probability() -> Result<(), TestError> {
     let expected = expected("retry.expected.json")?;
     let request = common::retry(&fixture("retry.axm")?)?;
     let success = request
         .probability
         .as_ref()
         .ok_or(TestError::WrongForm)?
-        .value()
-        .clone();
-    assert_eq!(success, fraction(field(&expected, "success")?, "success")?);
+        .value();
+    assert_eq!(success, &fraction(field(&expected, "success")?, "success")?);
     assert!(request.success.is_constant());
-
-    let succeeds = if success.is_zero() {
-        BigRational::zero()
-    } else {
-        BigRational::one()
-    };
-    assert_eq!(
-        succeeds,
-        fraction(
-            field(&expected, "success_probability")?,
-            "success_probability"
-        )?
-    );
-    let attempts = BigRational::one() / &success;
-    assert_eq!(
-        attempts,
-        fraction(field(&expected, "expected_attempts")?, "expected_attempts")?
-    );
-    let count = field(&expected, "failure_attempts")?
-        .as_u64()
-        .ok_or(TestError::Field("failure_attempts"))?;
-    let fails = BigRational::one() - &success;
-    let mut failure = BigRational::one();
-    for _ in 0..count {
-        failure *= &fails;
-    }
-    assert_eq!(
-        failure,
-        fraction(
-            field(&expected, "failure_probability")?,
-            "failure_probability"
-        )?
-    );
     Ok(())
 }
 

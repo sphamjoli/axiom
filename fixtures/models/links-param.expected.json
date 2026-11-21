@@ -1,5 +1,4 @@
 {
-  "kind": "chain",
   "parameters": [
     { "name": "a", "lower": { "num": "0", "den": "1" }, "lower_closed": false, "upper": { "num": "1", "den": "1" }, "upper_closed": false },
     { "name": "b", "lower": { "num": "0", "den": "1" }, "lower_closed": false, "upper": { "num": "1", "den": "1" }, "upper_closed": false }
