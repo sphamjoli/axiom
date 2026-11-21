@@ -1,0 +1,18 @@
+[package]
+name = "axiom-sim"
+description = "Exact-seed sampling of chains and retries, and Hoeffding estimates"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+axiom-core.workspace = true
+axiom-model.workspace = true
+num-bigint.workspace = true
+num-rational.workspace = true
+num-traits.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

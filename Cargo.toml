@@ -1,9 +1,10 @@
 # axiom-core must not depend on any other workspace crate; axiom-cert and
-# axiom-model may each depend only on axiom-core; axiom-cli and axiom-wasm
-# may each depend on any of those three, but not on each other.
+# axiom-model may each depend only on axiom-core; axiom-sim may depend only
+# on axiom-core and axiom-model; axiom-cli and axiom-wasm may each depend on
+# any of those four, but not on each other.
 [workspace]
 resolver = "3"
-members = ["crates/axiom-core", "crates/axiom-cert", "crates/axiom-model", "crates/axiom-cli", "crates/axiom-wasm"]
+members = ["crates/axiom-core", "crates/axiom-cert", "crates/axiom-model", "crates/axiom-sim", "crates/axiom-cli", "crates/axiom-wasm"]
 
 [workspace.package]
 version = "0.1.0"
@@ -15,6 +16,7 @@ publish = false
 axiom-core = { path = "crates/axiom-core", version = "0.1.0" }
 axiom-cert = { path = "crates/axiom-cert", version = "0.1.0" }
 axiom-model = { path = "crates/axiom-model", version = "0.1.0" }
+axiom-sim = { path = "crates/axiom-sim", version = "0.1.0" }
 num-bigint = { version = "0.4.6" }
 num-rational = { version = "0.4.2", default-features = false, features = ["num-bigint-std", "std"] }
 num-traits = { version = "0.2.19" }

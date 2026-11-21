@@ -57,6 +57,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "axiom-sim"
+version = "0.1.0"
+dependencies = [
+ "axiom-core",
+ "axiom-model",
+ "num-bigint",
+ "num-rational",
+ "num-traits",
+ "thiserror",
+]
+
+[[package]]
 name = "axiom-wasm"
 version = "0.1.0"
 dependencies = [
