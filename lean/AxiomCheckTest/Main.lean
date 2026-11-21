@@ -71,6 +71,21 @@ def readerCases : List Outcome :=
        | .ok (.str text) => text == "1\n" ++ String.singleton (Char.ofNat 0x1F600)
        | _ => false)
       "escapes were not decoded"
+  , expect "accepts an object with the most members allowed"
+      (jsonAccepts ("{" ++ ",".intercalate ((List.range 8).map fun i => s!"\"k{i}\":0") ++ "}"))
+      "rejected 8 members"
+  , expect "rejects an object with too many members"
+      (!jsonAccepts ("{" ++ ",".intercalate ((List.range 9).map fun i => s!"\"k{i}\":0") ++ "}"))
+      "accepted 9 members"
+  , expect "rejects thousands of members without exhausting the stack"
+      (!jsonAccepts ("{" ++ ",".intercalate ((List.range 5000).map fun i => s!"\"k{i}\":0") ++ "}"))
+      "accepted 5000 members"
+  , expect "accepts an array with the most items allowed"
+      (jsonAccepts ("[" ++ ",".intercalate (List.replicate 64 "0") ++ "]"))
+      "rejected 64 items"
+  , expect "rejects an array with too many items"
+      (!jsonAccepts ("[" ++ ",".intercalate (List.replicate 65 "0") ++ "]"))
+      "accepted 65 items"
   , expect "rejects an integer with 21 digits" (!jsonAccepts (String.mk (List.replicate 21 '1')))
       "accepted 21 digits"
   ]
@@ -104,6 +119,14 @@ def rejectionCases : IO (List Outcome) := do
       pure (expect s!"reader accepts {name} structurally" accepted "rejected an arithmetic fixture")
     else
       pure (expect s!"rejects {name}" (!accepted) "accepted a rejection fixture")
+
+/-- One case per acceptance fixture. -/
+def acceptanceCases : IO (List Outcome) := do
+  let entries ← (fixtureDirectory / "accept").readDir
+  let names : List String := (entries.map (·.fileName)).toList.mergeSort (· ≤ ·)
+  names.mapM fun (name : String) => do
+    let text ← IO.FS.readFile (fixtureDirectory / "accept" / name)
+    pure (expect s!"accepts {name}" (certificateAccepts text) "rejected an acceptance fixture")
 
 /-- Cases for size and shape limits that are impractical as fixture files. -/
 def limitCases : List Outcome :=
@@ -140,7 +163,8 @@ end AxiomCheckTest
 open AxiomCheckTest in
 /-- Runs every case, prints failures, and returns 1 if any failed. -/
 def main : IO UInt32 := do
-  let outcomes := readerCases ++ (← goldenCases) ++ (← rejectionCases) ++ limitCases
+  let outcomes :=
+    readerCases ++ (← goldenCases) ++ (← acceptanceCases) ++ (← rejectionCases) ++ limitCases
   let failures := outcomes.filterMap fun outcome => outcome.failure.map (outcome.name, ·)
   for (name, why) in failures do
     IO.eprintln s!"FAIL {name}: {why}"

@@ -12,7 +12,9 @@ strings and non-negative integers written as plain decimal digits. Objects
 keep every key in order, including repeats, so later validation can reject
 duplicates. `true`, `false`, `null`, signs, fractions and exponents are
 rejected. Every recursive call either consumes input or descends one level,
-and both are bounded, so the reader always terminates.
+and both are bounded, so the reader always terminates. Objects are limited to
+`maxMembers` members and arrays to `maxItems` items, which bounds the
+interpreter's recursion depth as well as the work done by later validation.
 -/
 
 namespace AxiomCheck.Json
@@ -42,6 +44,14 @@ structure Error where
 /-- The deepest nesting of arrays and objects the reader accepts. A
 certificate needs four levels. -/
 def maxDepth : Nat := 8
+
+/-- The most members an object may have. A certificate's largest object has
+four keys. -/
+def maxMembers : Nat := 8
+
+/-- The most items an array may have. A certificate has at most 16 rows of 16
+entries, and at most 16 distinct claims. -/
+def maxItems : Nat := 64
 
 /-- The longest run of digits accepted in an integer. Large enough for any
 64-bit unsigned value. -/
@@ -193,7 +203,9 @@ mutual
       let (item, next) ← readValue input fuel depth i
       let next := skipWhitespace input next
       match input[next]? with
-      | some ',' => readItems input fuel depth (next + 1) (item :: acc)
+      | some ',' =>
+        if acc.length + 1 ≥ maxItems then throw ⟨next, "array has too many items"⟩
+        else readItems input fuel depth (next + 1) (item :: acc)
       | some ']' => pure (.arr (item :: acc).reverse, next + 1)
       | _ => throw ⟨next, "expected , or ] in array"⟩
 
@@ -211,7 +223,9 @@ mutual
       let (value, next) ← readValue input fuel depth (next + 1)
       let next := skipWhitespace input next
       match input[next]? with
-      | some ',' => readMembers input fuel depth (next + 1) ((key, value) :: acc)
+      | some ',' =>
+        if acc.length + 1 ≥ maxMembers then throw ⟨next, "object has too many members"⟩
+        else readMembers input fuel depth (next + 1) ((key, value) :: acc)
       | some '}' => pure (.obj ((key, value) :: acc).reverse, next + 1)
       | _ => throw ⟨next, "expected , or } in object"⟩
 end
