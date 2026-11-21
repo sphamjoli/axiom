@@ -5,10 +5,13 @@ use crate::fraction_text::FractionText;
 /// The constant value of the `format` field.
 pub(crate) const FORMAT: &str = "axiom-certificate";
 
-/// The format version this crate writes and reads.
-pub(crate) const VERSION: u32 = 1;
+/// The format version of a certificate whose claims are all `Mass`.
+pub(crate) const VERSION_1: u32 = 1;
 
-/// The JSON shape of a version 1 certificate, before validation.
+/// The format version that adds the `FixedPoint` and `Contraction` claims.
+pub(crate) const VERSION_2: u32 = 2;
+
+/// The JSON shape of a version 1 or 2 certificate, before validation.
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct CertificateDocument {
@@ -30,4 +33,6 @@ pub(crate) struct ModelDocument {
 #[serde(tag = "kind", deny_unknown_fields)]
 pub(crate) enum ClaimDocument {
     Mass { row: u64 },
+    FixedPoint { value: FractionText },
+    Contraction { factor: FractionText },
 }

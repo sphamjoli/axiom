@@ -15,6 +15,7 @@ dependencies = [
  "axiom-core",
  "num-bigint",
  "num-rational",
+ "num-traits",
  "proptest",
  "serde",
  "serde_json",

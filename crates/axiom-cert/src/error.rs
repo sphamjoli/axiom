@@ -21,7 +21,7 @@ pub enum CertificateError {
     /// The text is not valid JSON, has a field the format does not allow,
     /// repeats a field, lacks a required field, or has a value of the wrong
     /// JSON type.
-    #[error("certificate is not valid version 1 JSON (line {line}, column {column})")]
+    #[error("certificate is not valid certificate JSON (line {line}, column {column})")]
     Json {
         /// The one-based line where parsing stopped.
         line: usize,
@@ -82,6 +82,36 @@ pub enum CertificateError {
         claim: usize,
         /// The index of the earlier, identical claim.
         first: usize,
+    },
+    /// A claim's fraction is not in canonical form, or is not in the range
+    /// its claim kind allows.
+    #[error("claim {claim}: fraction is not in canonical form or out of range")]
+    InvalidClaimFraction {
+        /// The index of the claim in the claim list.
+        claim: usize,
+    },
+    /// A claim kind that the certificate's version does not include.
+    #[error("claim {claim} needs certificate version {needed}")]
+    ClaimNeedsVersion {
+        /// The index of the claim in the claim list.
+        claim: usize,
+        /// The lowest version that includes the claim kind.
+        needed: u32,
+    },
+    /// A `FixedPoint` or `Contraction` claim that is false for the model.
+    #[error("claim {claim} does not hold for the model")]
+    FalseClaim {
+        /// The index of the claim in the claim list.
+        claim: usize,
+    },
+    /// A claim that only applies to two-state models, in a model with a
+    /// different number of states.
+    #[error("claim {claim} needs a two-state model, but the model has {states} states")]
+    NotTwoState {
+        /// The index of the claim in the claim list.
+        claim: usize,
+        /// The number of states in the model.
+        states: usize,
     },
     /// A claim refers to a row the model does not have.
     #[error("claim {claim} refers to row {row}, but the model has {rows} rows")]

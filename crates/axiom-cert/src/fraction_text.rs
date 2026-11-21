@@ -2,14 +2,17 @@ use num_bigint::BigInt;
 use num_rational::BigRational;
 use serde::{Deserialize, Serialize};
 
-use crate::CertificateError;
-
 /// The largest number of decimal digits allowed in a numerator or
-/// denominator.
+/// denominator, not counting a sign.
 const MAX_DIGITS: usize = 64;
 
-/// A non-negative fraction as it appears in a certificate: two decimal
-/// strings, in lowest terms.
+/// A fraction as it appears in a certificate: two decimal strings, in lowest
+/// terms.
+///
+/// The denominator is always positive and unsigned. The numerator is unsigned
+/// unless [`Sign::Allowed`] is passed: then a negative value is written as
+/// `-` followed by the canonical digits of its magnitude, and `-0` is not
+/// allowed, so every value has exactly one encoding.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct FractionText {
@@ -17,9 +20,19 @@ pub(crate) struct FractionText {
     den: String,
 }
 
+/// Whether a numerator may carry a leading `-`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Sign {
+    /// Only non-negative values are allowed.
+    Forbidden,
+    /// Negative values are allowed, written with a leading `-`.
+    Allowed,
+}
+
 impl FractionText {
-    /// The canonical text of a non-negative fraction. `BigRational` keeps its
-    /// value in lowest terms with a positive denominator, so the output is
+    /// The canonical text of a fraction. `BigRational` keeps its value in
+    /// lowest terms with a positive denominator, and `BigInt` writes a
+    /// negative value as `-` followed by its digits, so the output is
     /// canonical by construction.
     pub(crate) fn from_fraction(value: &BigRational) -> Self {
         Self {
@@ -28,24 +41,16 @@ impl FractionText {
         }
     }
 
-    /// Parses the fraction at `row`, `entry`, rejecting every encoding other
-    /// than the canonical one.
-    pub(crate) fn to_fraction(
-        &self,
-        row: usize,
-        entry: usize,
-    ) -> Result<BigRational, CertificateError> {
-        let non_canonical = CertificateError::NonCanonicalFraction { row, entry };
-        let numerator = canonical_integer(&self.num, Zero::Allowed);
-        let denominator = canonical_integer(&self.den, Zero::Forbidden);
-        let (Some(numerator), Some(denominator)) = (numerator, denominator) else {
-            return Err(non_canonical);
+    /// Parses the fraction, or returns `None` for every encoding other than
+    /// the canonical one.
+    pub(crate) fn to_fraction(&self, sign: Sign) -> Option<BigRational> {
+        let numerator = match (sign, self.num.strip_prefix('-')) {
+            (Sign::Allowed, Some(magnitude)) => -canonical_integer(magnitude, Zero::Forbidden)?,
+            _ => canonical_integer(&self.num, Zero::Allowed)?,
         };
+        let denominator = canonical_integer(&self.den, Zero::Forbidden)?;
         let value = BigRational::new(numerator.clone(), denominator.clone());
-        if value.numer() != &numerator || value.denom() != &denominator {
-            return Err(non_canonical);
-        }
-        Ok(value)
+        (value.numer() == &numerator && value.denom() == &denominator).then_some(value)
     }
 }
 
