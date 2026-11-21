@@ -3,7 +3,7 @@
 mod common;
 
 use axiom_cert::{Certificate, CertificateError, Claim, MAX_CERTIFICATE_BYTES, MAX_STATES};
-use axiom_core::{ProbabilityError, TransitionMatrixError, TransitionRowError};
+use axiom_core::{ProbabilityError, TransitionMatrix, TransitionMatrixError, TransitionRowError};
 use common::{LINKS_MASS, TestError, link_chain};
 
 /// A two-state certificate whose first row has the given entries, whose
@@ -22,7 +22,7 @@ fn halves() -> &'static str {
 #[test]
 fn reads_the_golden_file_as_the_link_model() -> Result<(), TestError> {
     let certificate = Certificate::from_json(LINKS_MASS)?;
-    assert_eq!(certificate.matrix(), &link_chain()?.matrix());
+    assert_eq!(certificate.matrix(), Some(&link_chain()?.matrix()));
     assert_eq!(
         certificate.claims(),
         &[Claim::Mass { row: 0 }, Claim::Mass { row: 1 }]
@@ -33,7 +33,7 @@ fn reads_the_golden_file_as_the_link_model() -> Result<(), TestError> {
 #[test]
 fn accepts_a_minimal_valid_certificate() -> Result<(), TestError> {
     let certificate = Certificate::from_json(&certificate_text(halves(), 0))?;
-    assert_eq!(certificate.matrix().states(), 2);
+    assert_eq!(certificate.matrix().map(TransitionMatrix::states), Some(2));
     Ok(())
 }
 
@@ -87,8 +87,8 @@ fn accepts_zero_written_as_zero_over_one() -> Result<(), TestError> {
     assert_eq!(
         Certificate::from_json(&certificate_text(entries, 0))?
             .matrix()
-            .states(),
-        2
+            .map(TransitionMatrix::states),
+        Some(2)
     );
     Ok(())
 }
@@ -118,8 +118,8 @@ fn rejects_an_unrelated_format() {
 }
 
 #[test]
-fn rejects_versions_other_than_one_and_two() {
-    for version in ["0", "3"] {
+fn rejects_versions_other_than_one_to_three() {
+    for version in ["0", "4"] {
         let text = certificate_text(halves(), 0)
             .replace("\"version\":1", &format!("\"version\":{version}"));
         assert!(matches!(
@@ -205,7 +205,7 @@ fn accepts_64_digits_and_rejects_65() -> Result<(), TestError> {
     let within =
         format!(r#"{{"num":"{nines}","den":"{ten_to_63}"}},{{"num":"1","den":"{ten_to_63}"}}"#);
     let certificate = Certificate::from_json(&certificate_text(&within, 0))?;
-    assert_eq!(certificate.matrix().states(), 2);
+    assert_eq!(certificate.matrix().map(TransitionMatrix::states), Some(2));
     let ten_to_64 = format!("1{}", "0".repeat(64));
     let beyond = format!(r#"{{"num":"1","den":"{ten_to_64}"}},{{"num":"1","den":"1"}}"#);
     assert!(matches!(
@@ -341,7 +341,10 @@ fn uniform_certificate(states: usize) -> String {
 #[test]
 fn accepts_the_largest_allowed_model() -> Result<(), TestError> {
     let certificate = Certificate::from_json(&uniform_certificate(MAX_STATES))?;
-    assert_eq!(certificate.matrix().states(), MAX_STATES);
+    assert_eq!(
+        certificate.matrix().map(TransitionMatrix::states),
+        Some(MAX_STATES)
+    );
     Ok(())
 }
 

@@ -1,4 +1,4 @@
-use axiom_core::{ProbabilityError, TransitionMatrixError, TransitionRowError};
+use axiom_core::{ProbabilityError, TransitionMatrixError, TransitionRowError, TwoStateChainError};
 use thiserror::Error;
 
 /// The reason a certificate could not be written or read.
@@ -113,6 +113,43 @@ pub enum CertificateError {
         /// The number of states in the model.
         states: usize,
     },
+    /// The model has both or neither of `rows` and `retry`.
+    #[error("model must have exactly one of rows and retry")]
+    ModelForm,
+    /// A retry model in a certificate whose version does not include it.
+    #[error("retry model needs certificate version {needed}")]
+    ModelNeedsVersion {
+        /// The lowest version that includes the retry model.
+        needed: u32,
+    },
+    /// The retry model's success probability is not a canonical probability.
+    #[error("retry success is not a canonical probability")]
+    InvalidRetrySuccess,
+    /// A claim about a chain, in a certificate whose model is a retry loop.
+    #[error("claim {claim} needs a chain model")]
+    NotChain {
+        /// The index of the claim in the claim list.
+        claim: usize,
+    },
+    /// A `Termination` claim in a certificate whose model is a chain.
+    #[error("claim {claim} needs a retry model")]
+    NotRetry {
+        /// The index of the claim in the claim list.
+        claim: usize,
+    },
+    /// A step or attempt count above the format's limit.
+    #[error("claim {claim}: count is above the limit {limit}")]
+    CountOutOfRange {
+        /// The index of the claim in the claim list.
+        claim: usize,
+        /// The largest count the format allows.
+        limit: u64,
+    },
+    /// The engine cannot make the requested claim about the chain: it has no
+    /// unique steady state, or does not come within the tolerance in the
+    /// allowed number of steps.
+    #[error("no convergence bound can be certified for the chain")]
+    NoConvergenceBound(#[source] ConvergenceBoundError),
     /// A claim refers to a row the model does not have.
     #[error("claim {claim} refers to row {row}, but the model has {rows} rows")]
     RowOutOfRange {
@@ -135,4 +172,17 @@ impl From<serde_json::Error> for CertificateError {
             column: error.column(),
         }
     }
+}
+
+/// Why the engine could not certify a convergence bound.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
+#[non_exhaustive]
+pub enum ConvergenceBoundError {
+    /// The chain has no unique steady state or does not contract.
+    #[error(transparent)]
+    Chain(#[from] TwoStateChainError),
+    /// The chain does not come within the tolerance in at most the allowed
+    /// number of steps.
+    #[error("tolerance is not reached within the step limit")]
+    NotReached,
 }

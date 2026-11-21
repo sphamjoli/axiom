@@ -1,5 +1,5 @@
 //! The certificate fixtures shared with the Lean checker. Every file in
-//! `fixtures/certificates/reject/` breaks exactly one rule of the version 1 or 2
+//! `fixtures/certificates/reject/` breaks exactly one rule of the version 1, 2 or 3
 //! format and must be rejected; every file in `fixtures/certificates/accept/`
 //! is valid and must be accepted. The Lean checker's tests read the same files,
 //! so the two readers agree on what is valid.
@@ -25,7 +25,7 @@ fn every_rejection_fixture_is_rejected() -> io::Result<()> {
         );
         checked += 1;
     }
-    assert_eq!(checked, 49, "every fixture is checked");
+    assert_eq!(checked, 76, "every fixture is checked");
     Ok(())
 }
 
@@ -39,6 +39,6 @@ fn every_acceptance_fixture_is_accepted() -> Result<(), Box<dyn std::error::Erro
         Certificate::from_json(&fs::read_to_string(&path)?)?;
         checked += 1;
     }
-    assert_eq!(checked, 7, "every fixture is checked");
+    assert_eq!(checked, 14, "every fixture is checked");
     Ok(())
 }

@@ -1,0 +1,1 @@
+{"format":"axiom-certificate","version":3,"model":{"retry":{"success":{"num":"3","den":"10"}}},"claims":[{"kind":"ConvergenceBound","start":{"num":"1","den":"1"},"steps":13,"tolerance":{"num":"1","den":"1000"}}]}

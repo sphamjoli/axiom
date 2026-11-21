@@ -1,0 +1,1 @@
+{"format":"axiom-certificate","version":3,"model":{"retry":{"success":{"num":"3","den":"10"}}},"claims":[{"kind":"FixedPoint","value":{"num":"1","den":"4"}}]}
