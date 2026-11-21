@@ -5,8 +5,11 @@ import AxiomCheck.Json
 # Reading certificates
 
 Turns certificate text into a `Certificate`, enforcing the structural rules of
-the version 1 format in the same order as the engine's reader: size, JSON
-syntax and fields, `format`, `version`, matrix shape, fractions, then claims.
+the version 1 format: size, JSON syntax and fields, `format`, `version`, matrix
+shape, fractions, then claims. It accepts the same certificates as the
+engine's reader, except that it leaves the sum of each row to the claim check;
+the two readers may report a different first error for the same invalid
+certificate.
 Whether each row sums to one is a claim, so it is checked by the checker, not
 here. Error messages report positions and counts, never certificate text.
 -/
@@ -85,7 +88,7 @@ def claim (states : Nat) (value : Value) : Except String Claim := do
   let members ← exactMembers ["kind", "row"] value
   let (.str kind) ← field members "kind" | .error "kind must be a string"
   if kind != "Mass" then .error "unknown claim kind"
-  let (.nat row _) ← field members "row" | .error "row must be an integer"
+  let (.nat row) ← field members "row" | .error "row must be an integer"
   if row > maxRowIndex || row ≥ states then .error "claim refers to a missing row"
   else pure (.mass row)
 
@@ -105,7 +108,7 @@ def certificate (text : String) : Except String Certificate := do
   let members ← exactMembers ["format", "version", "model", "claims"] root
   let (.str format) ← field members "format" | .error "format must be a string"
   if format != "axiom-certificate" then .error "certificate format is not axiom-certificate"
-  let (.nat version _) ← field members "version" | .error "version must be an integer"
+  let (.nat version) ← field members "version" | .error "version must be an integer"
   if version != 1 then .error s!"unsupported certificate version"
   let model ← exactMembers ["rows"] (← field members "model")
   let rows ← matrix (← field model "rows")
