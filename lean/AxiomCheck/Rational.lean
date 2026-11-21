@@ -1,4 +1,4 @@
-import Batteries.Data.Rat.Lemmas
+import Batteries.Data.Rat
 
 /-!
 # Rational helpers
