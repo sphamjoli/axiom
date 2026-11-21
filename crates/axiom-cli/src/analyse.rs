@@ -6,6 +6,7 @@ use std::io::Read;
 use std::path::Path;
 
 use axiom_cert::Certificate;
+use axiom_core::TransitionMatrix;
 use axiom_model::{CheckedModel, MAX_INPUT_BYTES};
 
 use crate::error::CliError;
@@ -14,58 +15,75 @@ use crate::error::CliError;
 #[derive(Debug)]
 pub struct Summary {
     name: String,
-    states: usize,
+    states: Option<usize>,
     claims: usize,
     cert: String,
 }
 
 impl fmt::Display for Summary {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            formatter,
-            "chain {}: {} states, {} rows; wrote {} claims to {}",
-            self.name, self.states, self.states, self.claims, self.cert
-        )
+        match self.states {
+            Some(states) => write!(
+                formatter,
+                "chain {}: {states} states, {states} rows; wrote {} claims to {}",
+                self.name, self.claims, self.cert
+            ),
+            None => write!(
+                formatter,
+                "retry {}: wrote {} claims to {}",
+                self.name, self.claims, self.cert
+            ),
+        }
     }
 }
 
-/// Reads the model at `model` and, for a chain without parameters, writes a
-/// certificate to `cert` with a `Mass` claim for every row, plus `FixedPoint`
-/// and `Contraction` claims when the chain has two states and settles.
+/// The attempt count of the `failure_after` part of a `Termination` claim.
+const FAILURE_ATTEMPTS: u64 = 20;
+
+/// Reads the model at `model` and, for a model without parameters, writes a
+/// certificate to `cert`: for a chain, a `Mass` claim for every row, plus
+/// `FixedPoint`, `Contraction` and `ConvergenceBound` claims when the chain
+/// has two states and settles; for a retry loop, a `Termination` claim.
 pub fn run(model: &Path, cert: &Path) -> Result<Summary, CliError> {
     let source = read_model(model)?;
     let checked = axiom_model::parse(&source).map_err(|source| CliError::Model {
         path: model.to_path_buf(),
         source,
     })?;
-    let chain = match checked {
-        CheckedModel::Chain(chain) => chain,
-        CheckedModel::Retry(_) => {
-            return Err(CliError::Unsupported {
-                path: model.to_path_buf(),
-                what: "retry models are not yet supported: no claim kind covers them",
-            });
+    let parametric = |kind| CliError::Unsupported {
+        path: model.to_path_buf(),
+        what: kind,
+    };
+    let (name, certificate) = match checked {
+        CheckedModel::Chain(chain) => {
+            let matrix = chain.matrix.ok_or_else(|| {
+                parametric("parametric chains are not yet supported: no claim kind covers them")
+            })?;
+            (chain.name, Certificate::strongest(matrix))
+        }
+        CheckedModel::Retry(retry) => {
+            let success = retry.probability.ok_or_else(|| {
+                parametric("parametric retries are not yet supported: no claim kind covers them")
+            })?;
+            (
+                retry.name,
+                Certificate::termination(success, FAILURE_ATTEMPTS)?,
+            )
         }
     };
-    let Some(matrix) = chain.matrix else {
-        return Err(CliError::Unsupported {
-            path: model.to_path_buf(),
-            what: "parametric chains are not yet supported: no claim kind covers them",
-        });
-    };
-    let certificate = Certificate::strongest(matrix);
     let text = certificate.to_json()?;
     std::fs::write(cert, text).map_err(|source| CliError::Io {
         path: cert.to_path_buf(),
         source,
     })?;
     Ok(Summary {
-        name: chain.name,
-        states: certificate.matrix().states(),
+        name,
+        states: certificate.matrix().map(TransitionMatrix::states),
         claims: certificate.claims().len(),
         cert: cert.display().to_string(),
     })
 }
+
 
 /// Reads a model file, refusing files larger than the model size limit
 /// without reading more than one byte past it.

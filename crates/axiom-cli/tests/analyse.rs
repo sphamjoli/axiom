@@ -9,7 +9,7 @@ use common::{TestError, axiom, ensure, repo_root, scratch};
 #[test]
 fn reproduces_golden_certificate() -> Result<(), TestError> {
     let dir = scratch("golden")?;
-    let out = dir.join("links-fixed-point.json");
+    let out = dir.join("links-convergence.json");
     let model = repo_root().join("fixtures/models/links.axm");
     let output = axiom(&[
         OsStr::new("analyse"),
@@ -19,7 +19,7 @@ fn reproduces_golden_certificate() -> Result<(), TestError> {
     ])?;
     ensure(output.status.code() == Some(0), "analyse failed")?;
     let written = std::fs::read(&out)?;
-    let golden = std::fs::read(repo_root().join("fixtures/certificates/links-fixed-point.json"))?;
+    let golden = std::fs::read(repo_root().join("fixtures/certificates/links-convergence.json"))?;
     ensure(
         written == golden,
         "certificate differs from the golden file",
@@ -28,6 +28,30 @@ fn reproduces_golden_certificate() -> Result<(), TestError> {
     ensure(
         stdout.contains("2 states") && stdout.contains("2 rows"),
         "summary lacks the state and row counts",
+    )
+}
+
+#[test]
+fn reproduces_retry_golden_certificate() -> Result<(), TestError> {
+    let dir = scratch("retry-golden")?;
+    let out = dir.join("retry-termination.json");
+    let model = repo_root().join("fixtures/models/retry.axm");
+    let output = axiom(&[
+        OsStr::new("analyse"),
+        model.as_os_str(),
+        OsStr::new("--cert"),
+        out.as_os_str(),
+    ])?;
+    ensure(output.status.code() == Some(0), "analyse failed")?;
+    let written = std::fs::read(&out)?;
+    let golden = std::fs::read(repo_root().join("fixtures/certificates/retry-termination.json"))?;
+    ensure(
+        written == golden,
+        "certificate differs from the golden file",
+    )?;
+    ensure(
+        String::from_utf8_lossy(&output.stdout).contains("retry request: wrote 1 claims"),
+        "summary does not describe the retry",
     )
 }
 
@@ -62,8 +86,17 @@ fn rejects_faulty_model_with_position_and_no_echo() -> Result<(), TestError> {
 fn rejects_unsupported_models() -> Result<(), TestError> {
     let dir = scratch("unsupported")?;
     let out = dir.join("out.json");
-    for (file, kind) in [("retry.axm", "retry"), ("links-param.axm", "parametric")] {
-        let model = repo_root().join("fixtures/models").join(file);
+    let retry_param = dir.join("retry-param.axm");
+    std::fs::write(
+        &retry_param,
+        "param p in ]0, 1[\nretry request {\n  success p\n}\n",
+    )?;
+    let links_param = repo_root().join("fixtures/models/links-param.axm");
+    for (model, kind) in [
+        (links_param, "parametric chains"),
+        (retry_param, "parametric retries"),
+    ] {
+        let file = model.display();
         let output = axiom(&[
             OsStr::new("analyse"),
             model.as_os_str(),

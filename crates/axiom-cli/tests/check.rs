@@ -93,3 +93,54 @@ fn missing_certificate_exits_with_status_two() -> Result<(), TestError> {
     let output = check(&repo_root().join("fixtures/certificates/no-such-file.json"))?;
     ensure(output.status.code() == Some(2), "expected exit status 2")
 }
+
+#[test]
+fn accepts_convergence_and_termination_goldens() -> Result<(), TestError> {
+    if !lake_available("accepts_convergence_and_termination_goldens") {
+        return Ok(());
+    }
+    let links = check(&repo_root().join("fixtures/certificates/links-convergence.json"))?;
+    ensure(links.status.code() == Some(0), "expected exit status 0")?;
+    ensure(
+        String::from_utf8_lossy(&links.stdout).contains("claim 4 ConvergenceBound: accepted"),
+        "missing accepted convergence bound",
+    )?;
+    let retry = check(&repo_root().join("fixtures/certificates/retry-termination.json"))?;
+    ensure(retry.status.code() == Some(0), "expected exit status 0")?;
+    ensure(
+        String::from_utf8_lossy(&retry.stdout).contains("claim 0 Termination: accepted"),
+        "missing accepted termination",
+    )
+}
+
+#[test]
+fn rejects_false_convergence_and_termination_claims() -> Result<(), TestError> {
+    if !lake_available("rejects_false_convergence_and_termination_claims") {
+        return Ok(());
+    }
+    for (file, line) in [
+        (
+            "convergence-bound-too-few-steps.json",
+            "claim 0 ConvergenceBound: rejected",
+        ),
+        (
+            "periodic-convergence-bound.json",
+            "claim 0 ConvergenceBound: rejected",
+        ),
+        (
+            "termination-wrong-expected-attempts.json",
+            "claim 0 Termination: rejected",
+        ),
+    ] {
+        let output = check(&repo_root().join("fixtures/certificates/reject").join(file))?;
+        ensure(
+            output.status.code() == Some(1),
+            format!("{file}: expected exit status 1"),
+        )?;
+        ensure(
+            String::from_utf8_lossy(&output.stdout).contains(line),
+            format!("{file}: missing rejected verdict"),
+        )?;
+    }
+    Ok(())
+}

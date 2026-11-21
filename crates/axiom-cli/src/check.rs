@@ -162,14 +162,19 @@ fn parse_output(stdout: &str) -> Result<Vec<Verdict>, CliError> {
     Ok(verdicts)
 }
 
-/// Whether `text` has the form `claim <n> Mass row <r>`, `claim <n>
-/// FixedPoint` or `claim <n> Contraction`.
+/// Whether `text` has the form `claim <n> Mass row <r>` or `claim <n> <kind>`
+/// for one of the kinds `FixedPoint`, `Contraction`, `ConvergenceBound`
+/// and `Termination`.
 fn is_claim(text: &str) -> bool {
     let words: Vec<&str> = text.split(' ').collect();
     let number = |word: &str| !word.is_empty() && word.bytes().all(|b| b.is_ascii_digit());
     match words.as_slice() {
         ["claim", index, "Mass", "row", row] => number(index) && number(row),
-        ["claim", index, "FixedPoint" | "Contraction"] => number(index),
+        [
+            "claim",
+            index,
+            "FixedPoint" | "Contraction" | "ConvergenceBound" | "Termination",
+        ] => number(index),
         _ => false,
     }
 }
