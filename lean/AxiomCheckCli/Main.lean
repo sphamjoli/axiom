@@ -24,6 +24,8 @@ def verdictLine (index : Nat) (claim : Claim) (accepted : Bool) : String :=
   | .mass row => s!"claim {index} Mass row {row}: {verdict}"
   | .fixedPoint _ => s!"claim {index} FixedPoint: {verdict}"
   | .contraction _ => s!"claim {index} Contraction: {verdict}"
+  | .convergenceBound .. => s!"claim {index} ConvergenceBound: {verdict}"
+  | .termination .. => s!"claim {index} Termination: {verdict}"
 
 /-- Decides every claim, printing one verdict line each, and returns the exit
 status: 0 if all are accepted, 1 otherwise. -/

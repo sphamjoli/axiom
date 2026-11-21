@@ -20,7 +20,11 @@ def fixtureDirectory : System.FilePath := ".." / "fixtures" / "certificates"
 reader. -/
 def arithmeticFixtures : List String :=
   [ "does-not-sum-to-one.json", "wrong-fixed-point.json", "wrong-contraction-factor.json"
-  , "contraction-factor-one.json", "periodic-contraction.json" ]
+  , "contraction-factor-one.json", "periodic-contraction.json"
+  , "convergence-bound-too-few-steps.json", "periodic-convergence-bound.json"
+  , "identity-convergence-bound.json", "termination-wrong-expected-attempts.json"
+  , "termination-wrong-probability.json", "termination-expected-attempts-never-succeeds.json"
+  , "termination-wrong-failure-after.json" ]
 
 /-- The outcome of one test case: its name and, on failure, why. -/
 structure Outcome where
@@ -148,7 +152,7 @@ def acceptanceCases : IO (List Outcome) := do
 
 /-- The golden certificate with row 0 replaced by `row`. -/
 def goldenWithRow0 (row : List Fraction) : Certificate :=
-  ⟨[row, [⟨3, 10⟩, ⟨7, 10⟩]], [.mass 0, .mass 1]⟩
+  ⟨.chain [row, [⟨3, 10⟩, ⟨7, 10⟩]], [.mass 0, .mass 1]⟩
 
 /-- The link model's rows. -/
 def linkRows : List (List Fraction) := [[⟨9, 10⟩, ⟨1, 10⟩], [⟨3, 10⟩, ⟨7, 10⟩]]
@@ -168,22 +172,22 @@ def twoStateCases : IO (List Outcome) := do
     , expect "still checks the version 1 golden file"
         (checks (← IO.FS.readFile (fixtureDirectory / "links-mass.json")) == some true)
         "version 1 golden file did not check"
-    , expect "accepts steady state 1/4" (Check.check ⟨linkRows, [.fixedPoint ⟨1, 4⟩]⟩)
+    , expect "accepts steady state 1/4" (Check.check ⟨.chain linkRows, [.fixedPoint ⟨1, 4⟩]⟩)
         "rejected 1/4"
     , expect "rejects claimed steady state 3/10"
-        (!Check.check ⟨linkRows, [.fixedPoint ⟨3, 10⟩]⟩) "accepted 3/10"
-    , expect "accepts factor 3/5" (Check.check ⟨linkRows, [.contraction ⟨false, 3, 5⟩]⟩)
+        (!Check.check ⟨.chain linkRows, [.fixedPoint ⟨3, 10⟩]⟩) "accepted 3/10"
+    , expect "accepts factor 3/5" (Check.check ⟨.chain linkRows, [.contraction ⟨false, 3, 5⟩]⟩)
         "rejected 3/5"
-    , expect "rejects factor -3/5" (!Check.check ⟨linkRows, [.contraction ⟨true, 3, 5⟩]⟩)
+    , expect "rejects factor -3/5" (!Check.check ⟨.chain linkRows, [.contraction ⟨true, 3, 5⟩]⟩)
         "accepted -3/5"
     , expect "rejects factor 1, which is not below one"
-        (!Check.check ⟨identityRows, [.contraction ⟨false, 1, 1⟩]⟩) "accepted factor 1"
+        (!Check.check ⟨.chain identityRows, [.contraction ⟨false, 1, 1⟩]⟩) "accepted factor 1"
     , expect "rejects the periodic chain's factor -1"
-        (!Check.check ⟨periodicRows, [.contraction ⟨true, 1, 1⟩]⟩) "accepted factor -1"
+        (!Check.check ⟨.chain periodicRows, [.contraction ⟨true, 1, 1⟩]⟩) "accepted factor -1"
     , expect "accepts the periodic chain's steady state 1/2"
-        (Check.check ⟨periodicRows, [.fixedPoint ⟨1, 2⟩]⟩) "rejected 1/2"
+        (Check.check ⟨.chain periodicRows, [.fixedPoint ⟨1, 2⟩]⟩) "rejected 1/2"
     , expect "rejects a two-state claim about a one-state model"
-        (!Check.check ⟨[[⟨1, 1⟩]], [.fixedPoint ⟨1, 1⟩]⟩) "accepted a one-state model"
+        (!Check.check ⟨.chain [[⟨1, 1⟩]], [.fixedPoint ⟨1, 1⟩]⟩) "accepted a one-state model"
     , expect "rejects a version 2 claim kind in version 1"
         (!certificateAccepts
           ((golden.replace "\"version\": 2" "\"version\": 1")))
@@ -204,7 +208,7 @@ def checkCases : IO (List Outcome) := do
     , expect "rejects an entry above one"
         (!Check.check (goldenWithRow0 [⟨3, 2⟩, ⟨0, 1⟩])) "accepted 3/2"
     , expect "rejects a claim on a missing row"
-        (!Check.check ⟨[[⟨1, 1⟩]], [.mass 1]⟩) "accepted a missing row"
+        (!Check.check ⟨.chain [[⟨1, 1⟩]], [.mass 1]⟩) "accepted a missing row"
     , expect "accepts the unmutated golden model"
         (Check.check (goldenWithRow0 [⟨9, 10⟩, ⟨1, 10⟩])) "rejected the golden model" ]
 
@@ -226,6 +230,34 @@ def semanticsCases : List Outcome :=
         Semantics.ratPow (7 / 10) 20 == 79792266297612001 / 100000000000000000000)
       s!"failure probability {retry.failureAfter 20}"
   ]
+
+/-- Cases for the version 3 claims beyond the shared fixtures: both golden
+files, the alternation of the periodic chain, and the cost of the largest step
+count. -/
+def versionThreeCases : IO (List Outcome) := do
+  let links ← IO.FS.readFile (fixtureDirectory / "links-convergence.json")
+  let retry ← IO.FS.readFile (fixtureDirectory / "retry-termination.json")
+  let periodic : Semantics.TwoState := ⟨1, 1⟩
+  pure
+    [ expect "reads and checks the convergence golden file"
+        (match Parse.certificate links with
+         | .ok c => c.claims.getLast? == some (.convergenceBound ⟨1, 1⟩ 13 ⟨1, 1000⟩) && Check.check c
+         | .error _ => false)
+        "convergence golden file did not check"
+    , expect "reads and checks the termination golden file"
+        (match Parse.certificate retry with
+         | .ok c => c.model == .retry ⟨3, 10⟩ &&
+           c.claims == [.termination ⟨1, 1⟩ (some ⟨10, 3⟩)
+             (some (20, ⟨79792266297612001, 100000000000000000000⟩))] && Check.check c
+         | .error _ => false)
+        "termination golden file did not check"
+    , expect "the periodic chain alternates"
+        ((List.range 6).map (periodic.iterate 1) == [1, 0, 1, 0, 1, 0])
+        "periodic chain did not alternate"
+    , expect "checks the largest step count in time"
+        (!Check.check ⟨.chain [[⟨999999, 1000000⟩, ⟨1, 1000000⟩], [⟨1, 1000000⟩, ⟨999999, 1000000⟩]],
+          [.convergenceBound ⟨1, 1⟩ 1000 ⟨1, 10 ^ 60⟩]⟩)
+        "accepted a bound the slow chain does not reach" ]
 
 /-- Cases for size and shape limits that are impractical as fixture files. -/
 def limitCases : List Outcome :=
@@ -263,7 +295,7 @@ open AxiomCheckTest in
 /-- Runs every case, prints failures, and returns 1 if any failed. -/
 def main : IO UInt32 := do
   let outcomes :=
-    readerCases ++ (← goldenCases) ++ (← checkCases) ++ (← twoStateCases) ++ (← acceptanceCases) ++ (← rejectionCases) ++ semanticsCases ++ limitCases
+    readerCases ++ (← goldenCases) ++ (← checkCases) ++ (← twoStateCases) ++ (← versionThreeCases) ++ (← acceptanceCases) ++ (← rejectionCases) ++ semanticsCases ++ limitCases
   let failures := outcomes.filterMap fun outcome => outcome.failure.map (outcome.name, ·)
   for (name, why) in failures do
     IO.eprintln s!"FAIL {name}: {why}"

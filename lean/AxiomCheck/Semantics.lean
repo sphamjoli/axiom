@@ -27,6 +27,31 @@ def ratPow (x : Rat) : Nat → Rat
   | 0 => 1
   | k + 1 => ratPow x k * x
 
+/-- Multiplies `acc` by `x` `k` times, in a tail-recursive loop so that
+evaluating a large power does not exhaust the interpreter's stack. -/
+def ratPowLoop (x : Rat) : Rat → Nat → Rat
+  | acc, 0 => acc
+  | acc, k + 1 => ratPowLoop x (acc * x) k
+
+/-- Starting from `x ^ j`, the loop computes `x ^ (j + k)`. -/
+theorem ratPowLoop_eq (x : Rat) (j k : Nat) :
+    ratPowLoop x (ratPow x j) k = ratPow x (j + k) := by
+  induction k generalizing j with
+  | zero => rfl
+  | succ k ih =>
+    show ratPowLoop x (ratPow x (j + 1)) k = _
+    rw [ih, Nat.add_right_comm, Nat.add_assoc]
+
+/-- `x` raised to the natural power `k`, by the loop. -/
+def ratPowFast (x : Rat) (k : Nat) : Rat := ratPowLoop x 1 k
+
+/-- Compiled code evaluates `ratPow` with the loop. -/
+@[csimp] theorem ratPow_eq_fast : @ratPow = @ratPowFast := by
+  funext x k
+  have h := ratPowLoop_eq x 0 k
+  rw [Nat.zero_add] at h
+  exact h.symm
+
 /-- The sum of a list of rationals. -/
 def ratSum (xs : List Rat) : Rat := xs.foldr (· + ·) 0
 
@@ -159,6 +184,16 @@ def ConvergenceBoundHolds (m : TwoState) (start : Rat) (steps : Nat)
     (tolerance : Rat) : Prop :=
   ∀ t, steps ≤ t → ratAbs (m.iterate start t - m.fixedPoint) ≤ tolerance
 
+/-- The decidable facts a `Termination` claim is checked against: `p` is a
+probability, `probability` is the closed-form success probability, the
+expected attempts, when given, are `1 / p` with `p ≠ 0`, and the failure
+probability after `k` attempts, when given, is `(1 - p) ^ k`. -/
+def TerminationCertified (m : Retry) (probability : Rat) (expected : Option Rat)
+    (failure : Option (Nat × Rat)) : Prop :=
+  (0 ≤ m.p ∧ m.p ≤ 1) ∧ probability = m.successProbability ∧
+    (∀ e, expected = some e → m.p ≠ 0 ∧ e = m.expectedAttempts) ∧
+    (∀ k q, failure = some (k, q) → q = ratPow (1 - m.p) k)
+
 /-- `Termination`: `probability` is the least fixed point of the retry loop's
 equation, that is, the probability that it eventually succeeds. -/
 def TerminationHolds (m : Retry) (probability : Rat) : Prop :=
@@ -184,15 +219,34 @@ def twoState (c : Certificate) : Option TwoState :=
   | [[_, a], [b, _]] => some ⟨Fraction.toRat a, Fraction.toRat b⟩
   | _ => none
 
+/-- The retry loop of a certificate whose model is a retry model. -/
+def retryModel (c : Certificate) : Option Retry :=
+  match c.model with
+  | .retry success => some ⟨Fraction.toRat success⟩
+  | .chain _ => none
+
+/-- The rational value of an optional `failure_after` pair. -/
+def failureToRat (failure : Option (Nat × Fraction)) : Option (Nat × Rat) :=
+  failure.map fun (k, q) => (k, Fraction.toRat q)
+
 /-- The rational entries of row `r` of a certificate, if it exists. -/
 def rowValues (c : Certificate) (r : Nat) : Option (List Rat) :=
   (c.rows[r]?).map (·.map Fraction.toRat)
 
-/-- What a claim in a certificate asserts about its embedded model. -/
+/-- What a claim in a certificate asserts about its embedded model, as
+decidable facts. For `convergenceBound` and `termination` these are the
+certified facts; `AxiomCheck.Theorems` proves that they imply the claims'
+full meaning, `ConvergenceBoundHolds` and `TerminationHolds`. -/
 def ClaimHolds (c : Certificate) : Claim → Prop
   | .mass r => ∃ row, rowValues c r = some row ∧ MassHolds row
   | .fixedPoint v => ∃ m, twoState c = some m ∧ FixedPointHolds m (Fraction.toRat v)
   | .contraction f => ∃ m, twoState c = some m ∧ ContractionHolds m (SignedFraction.toRat f)
+  | .convergenceBound start steps tolerance =>
+    ∃ m, twoState c = some m ∧ m.a + m.b ≠ 0 ∧ ratAbs m.lam ≤ 1 ∧
+      ConvergenceBoundCertified m (Fraction.toRat start) steps (Fraction.toRat tolerance)
+  | .termination probability expected failure =>
+    ∃ m, retryModel c = some m ∧ TerminationCertified m (Fraction.toRat probability)
+      (expected.map Fraction.toRat) (failureToRat failure)
 
 /-- Every claim of the certificate holds. -/
 def CertificateHolds (c : Certificate) : Prop :=
