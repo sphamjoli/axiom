@@ -10,10 +10,12 @@ fn halves() -> Result<TransitionRow, TestError> {
 }
 
 #[test]
-fn accepts_a_square_matrix() -> Result<(), TestError> {
-    let matrix = TransitionMatrix::try_new(vec![halves()?, halves()?])?;
+fn accepts_a_square_matrix_and_keeps_its_rows_in_order() -> Result<(), TestError> {
+    let first = TransitionRow::two_state(probability(1, 10)?);
+    let second = TransitionRow::two_state(probability(7, 10)?);
+    let matrix = TransitionMatrix::try_new(vec![first.clone(), second.clone()])?;
     assert_eq!(matrix.states(), 2);
-    assert_eq!(matrix.rows().len(), 2);
+    assert_eq!(matrix.rows(), [first, second].as_slice());
     Ok(())
 }
 

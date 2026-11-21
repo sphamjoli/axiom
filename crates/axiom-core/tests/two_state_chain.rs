@@ -40,8 +40,10 @@ fn link_model_rows_are_exact() -> Result<(), TestError> {
 
 #[test]
 fn link_model_update_is_six_tenths_d_plus_one_tenth() -> Result<(), TestError> {
-    let update = link_chain()?.second_state_update();
+    let chain = link_chain()?;
+    let update = chain.second_state_update();
     assert_eq!(update.factor(), &ratio(3, 5));
+    assert_eq!(chain.contraction_factor(), ratio(3, 5));
     assert_eq!(update.offset(), &ratio(1, 10));
     Ok(())
 }
@@ -59,8 +61,11 @@ fn link_model_iterates_exactly_from_all_links_down() -> Result<(), TestError> {
 
 #[test]
 fn chain_that_always_switches_alternates_with_factor_minus_one() -> Result<(), TestError> {
-    let update = TwoStateChain::new(probability(1, 1)?, probability(1, 1)?).second_state_update();
+    let chain = TwoStateChain::new(probability(1, 1)?, probability(1, 1)?);
+    let update = chain.second_state_update();
     assert_eq!(update.factor(), &ratio(-1, 1));
+    assert_eq!(chain.contraction_factor(), ratio(-1, 1));
+    assert_eq!(chain.steady_state()?.value(), &ratio(1, 2));
     let terms: Vec<BigRational> = update.iterate(ratio(1, 4)).take(4).collect();
     assert_eq!(
         terms,
@@ -127,15 +132,6 @@ proptest! {
 fn link_model_steady_state_is_one_quarter() -> Result<(), TestError> {
     let chain = link_chain()?;
     assert_eq!(chain.steady_state()?.value(), &ratio(1, 4));
-    assert_eq!(chain.contraction_factor(), ratio(3, 5));
-    Ok(())
-}
-
-#[test]
-fn periodic_chain_has_factor_minus_one_and_steady_state_one_half() -> Result<(), TestError> {
-    let chain = TwoStateChain::new(probability(1, 1)?, probability(1, 1)?);
-    assert_eq!(chain.contraction_factor(), ratio(-1, 1));
-    assert_eq!(chain.steady_state()?.value(), &ratio(1, 2));
     Ok(())
 }
 
