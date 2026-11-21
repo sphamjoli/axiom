@@ -1,5 +1,7 @@
 import AxiomCheck
 import AxiomCheck.Theorems
+import AxiomCheck.Estimate
+import AxiomCheck.Theorems.Estimate
 import Lean
 
 /-!
@@ -8,8 +10,9 @@ import Lean
 Kernel-level audit run by `scripts/checkLeanAxioms.sh`. Every constant declared
 in a module of the `AxiomCheck` library must depend only on `propext`,
 `Classical.choice`, and `Quot.sound`; any other axiom, including `sorryAx` and
-`Lean.ofReduceBool`, is reported as an error. `AxiomCheck.Theorems` is imported
-explicitly because the checker root leaves it out to avoid loading Mathlib. The audit also fails if no
+`Lean.ofReduceBool`, is reported as an error. `AxiomCheck.Theorems`,
+`AxiomCheck.Estimate` and `AxiomCheck.Theorems.Estimate` are imported
+explicitly because the checker root does not import them. The audit also fails if no
 `AxiomCheck` module is imported, so renaming the library cannot silently turn
 it into a no-op.
 
