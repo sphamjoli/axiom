@@ -10,7 +10,7 @@ Three tools must be installed before any command below will work.
 | --- | --- |
 | rustup | Installs and selects Rust toolchains. The version this project uses is pinned in `rust-toolchain.toml`, and rustup installs it automatically on first use. |
 | elan | The Lean version manager, the Lean counterpart of rustup. The Lean version is pinned in `lean/lean-toolchain`. |
-| bun | A JavaScript runtime. It runs the scripts that the Git hooks use to check formatting and commit messages; the project itself contains no JavaScript. |
+| bun | A JavaScript runtime and package manager. It runs the scripts that the Git hooks use to check formatting and commit messages, and it installs, checks and builds the web interface in `ui/`. |
 
 `actionlint`, a linter for GitHub Actions workflows, is optional. When it is installed, the hooks also check workflow files.
 
@@ -49,6 +49,7 @@ The individual targets are listed below; `make help` prints the same list.
 | `make lean-check` | A fast text search for Lean constructs that skip or bypass proof checking: `sorry`, `admit`, `native_decide`, new `axiom` declarations and similar. |
 | `make lean-build` | Builds the Lean checker, treating warnings as errors. |
 | `make lean-test` | Runs the checker tests in `lean/AxiomCheckTest/` against the shared certificate fixtures. |
+| `make ui-check` | Installs the web interface dependencies from `ui/bun.lock`, typechecks the interface with `vue-tsc` and builds it with Vite. |
 | `make lean-audit` | Asks the Lean kernel which axioms each checker declaration depends on, and fails unless the only ones are the three standard axioms of Lean's logic (`propext`, `Classical.choice` and `Quot.sound`). This catches bypasses that the text search misses. |
 
 On some recent macOS versions the mathlib cache tool fails to start. `make lean-cache`, and therefore `make lean-build` and `make lean-audit`, then fail locally even though `cd lean && lake build` succeeds. CI runs on Linux and is unaffected.
@@ -60,8 +61,20 @@ On some recent macOS versions the mathlib cache tool fails to start. `make lean-
 | `Cargo.toml`, `crates/` | The Rust engine, a Cargo workspace. `crates/axiom-core` holds exact probabilities, transition rows, two-state chains and affine updates. `crates/axiom-cert` writes and reads certificates in the version 1 format. Each crate keeps its tests in its own `tests/` folder. |
 | `lean/` | The Lean 4 project for the `AxiomCheck` checker, pinned to Lean v4.19.0 and mathlib v4.19.0. `AxiomCheck/Json.lean` is the strict JSON reader and `AxiomCheck/Parse.lean` the certificate reader; their tests are in `lean/AxiomCheckTest/`. `lean/scripts/AxiomAudit.lean` implements the axiom audit. |
 | `fixtures/certificates/` | Certificates shared by the engine's and the checker's tests: a golden file both must read, and rejection fixtures both must reject. |
+| `ui/` | The web interface, written in Vue 3 and TypeScript and built with Vite and Tailwind CSS. It talks to the engine through the `Engine` interface in `ui/src/engine/types.ts`; until the engine is compiled to WebAssembly, `ui/src/engine/mock.ts` stands in for it. |
 | `scripts/` | The checks run by the Git hooks and by CI. |
 | `.github/` | CI workflows, the pull request template, issue templates and label definitions. |
+
+## Web interface
+
+The web interface lives in `ui/` and has its own dependencies, pinned to exact versions in `ui/package.json` and locked in `ui/bun.lock`. Run these commands from `ui/`:
+
+| Command | What it does |
+| --- | --- |
+| `bun install` | Installs the dependencies. |
+| `bun run dev` | Starts a development server that reloads on every change. |
+| `bun run typecheck` | Typechecks the TypeScript and Vue sources in strict mode. |
+| `bun run build` | Builds the static site into `ui/dist/`, which Git ignores. |
 
 ## Git hooks
 
