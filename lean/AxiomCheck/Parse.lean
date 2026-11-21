@@ -33,7 +33,8 @@ def exactMembers (expected : List String) :
     Value → Except String (List (String × Value))
   | .obj members =>
     let keys := members.map Prod.fst
-    if keys.eraseDups.length != keys.length then .error "repeated field"
+    if keys.length > expected.length then .error "unexpected or missing field"
+    else if keys.eraseDups.length != keys.length then .error "repeated field"
     else if keys.all expected.contains && expected.all keys.contains then .ok members
     else .error "unexpected or missing field"
   | _ => .error "expected an object"
