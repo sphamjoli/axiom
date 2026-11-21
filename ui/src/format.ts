@@ -9,6 +9,11 @@ export function count(value: number): string {
   return Math.trunc(value).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 }
 
+// A count with its noun, singular or plural: "1 run", "38 005 runs".
+export function counted(value: number, singular: string, plural = `${singular}s`): string {
+  return `${count(value)} ${Math.trunc(value) === 1 ? singular : plural}`;
+}
+
 function gcd(a: bigint, b: bigint): bigint {
   let x = a < 0n ? -a : a;
   let y = b < 0n ? -b : b;

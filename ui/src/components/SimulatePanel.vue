@@ -6,7 +6,7 @@ import RunningMeanPlot from "./RunningMeanPlot.vue";
 import SamplePaths from "./SamplePaths.vue";
 import SimulationVerdict from "./SimulationVerdict.vue";
 import { SIM_CAPS, type Analysis, type Engine, type SimulateRequest, type Simulation, type SimulationError } from "../engine/types";
-import { complement, count, fractionText } from "../format";
+import { complement, count, counted, fractionText } from "../format";
 import { createClock } from "../playback";
 import { encodeRun, inRange, isSeed, type SharedRun } from "../shareLink";
 
@@ -44,14 +44,14 @@ const canRun = computed(
 
 // What a run does, in plain words, from the model and the settings.
 const explanation = computed(() => {
-  const n = samplesValid.value ? count(samples.value) : "the";
+  const runs = (singular: string, plural = `${singular}s`): string => (samplesValid.value ? counted(samples.value, singular, plural) : `the ${plural}`);
   const chain = props.analysis.chain;
   if (chain) {
     const [first, second] = [chain.states[0] ?? "", chain.states[1] ?? chain.states[0] ?? ""];
-    return `Runs ${n} copies of ${chain.name} from ${first} for ${steps.value} steps, rolling the chances in your model at each step, then counts how many end ${second}.`;
+    return `Simulates ${runs("copy", "copies")} of ${chain.name} from ${first} for ${counted(steps.value, "step")}, rolling the chances in your model at each step, then counts how many end ${second}.`;
   }
   const success = props.analysis.retry ? fractionText(props.analysis.retry.success) : "";
-  return `Runs ${n} requests, each tried up to ${maxAttempts.value} times with a ${success} chance of success per attempt, then counts the attempts each needed.`;
+  return `Simulates ${runs("request")}, each tried up to ${counted(maxAttempts.value, "time")} with a ${success} chance of success per attempt, then counts the attempts each needed.`;
 });
 
 const guarantee = computed(() => {
@@ -60,7 +60,7 @@ const guarantee = computed(() => {
   const confidence = complement(sim.delta);
   return sim.estimate
     ? `With this many runs the count is within ${fractionText(sim.epsilon)} of the true chance at least ${confidence.num} times in ${confidence.den}.`
-    : `That guarantee needs at least ${count(sim.requiredSamples)} runs.`;
+    : null;
 });
 
 // "Run k of n · step s" while the replay plays.
@@ -106,6 +106,11 @@ async function simulate(request: SimulateRequest): Promise<void> {
     result.value = null;
     failure.value = outcome.error;
   }
+}
+
+// Sets the run count to the least that gives an estimate.
+function useRequired(required: number): void {
+  samples.value = required;
 }
 
 function run(): void {
@@ -166,7 +171,7 @@ onMounted(() => {
       </label>
       <div class="flex flex-wrap items-center gap-2 sm:col-span-3">
         <button class="btn btn-primary" type="submit" :disabled="!canRun" :aria-busy="running">
-          {{ running ? "Running" : samplesValid ? `Run ${count(samples)} runs` : "Run" }}
+          {{ running ? "Running" : samplesValid ? `Simulate ${counted(samples, "run")}` : "Simulate" }}
         </button>
         <template v-if="lastRequest">
           <button class="btn" type="button" :disabled="running" @click="rerun">Replay</button>
@@ -182,16 +187,16 @@ onMounted(() => {
 
     <div v-if="result" class="sim-result mt-5 grid gap-5">
       <div class="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-rule pb-2 text-sm text-ink-muted">
-        <span>{{ count(result.samples) }} runs of {{ result.name }}, seed</span>
+        <span>{{ counted(result.samples, "run") }} of {{ result.name }}, seed</span>
         <code class="select-all font-mono text-ink">{{ result.seed }}</code>
         <button class="btn py-0.5 text-xs" type="button" @click="copy('seed', result.seed)">{{ copied === "seed" ? "Seed copied" : "Copy seed" }}</button>
         <button class="btn py-0.5 text-xs" type="button" @click="copyLink">{{ copied === "link" ? "Link copied" : "Copy link to this run" }}</button>
       </div>
-      <p class="text-sm text-ink">{{ guarantee }}</p>
+      <p v-if="guarantee" class="text-sm text-ink">{{ guarantee }}</p>
 
       <PlaybackControls :clock="replay">{{ progress }}</PlaybackControls>
 
-      <SimulationVerdict :result="result" />
+      <SimulationVerdict :result="result" @use-required="useRequired" />
 
       <template v-if="result.chain && analysis.chain">
         <SamplePaths :run="result.chain" :transitions="analysis.chain.transitions" :reveal="reveal" />

@@ -2,7 +2,7 @@
 import { computed } from "vue";
 import Frac from "./Frac.vue";
 import type { ChainRun, Fraction } from "../engine/types";
-import { approx, count, fractionText } from "../format";
+import { approx, count, counted, fractionText } from "../format";
 
 // `reveal` in [0, 1] is how far through the samples the replay has got.
 const props = defineProps<{ run: ChainRun; epsilon: Fraction; reveal: number }>();
@@ -50,7 +50,7 @@ const view = computed(() => {
       <text :x="W - M.r" :y="H - 10" text-anchor="end" class="fill-ink-muted font-mono text-[11px]">k = {{ count(view.n) }}</text>
     </svg>
     <p class="mt-1 text-sm text-ink-muted">
-      After all {{ count(view.n) }} samples: <Frac :value="run.fraction" />.
+      After all {{ counted(view.n, "sample") }}: <Frac :value="run.fraction" />.
       <template v-if="run.steadyState">The exact steady state is <Frac :value="run.steadyState" />; the shaded band is &#177; <Frac :value="epsilon" />.</template>
       <template v-else>This chain does not settle to a steady state, so there is no exact value to compare with.</template>
     </p>

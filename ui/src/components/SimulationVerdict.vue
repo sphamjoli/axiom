@@ -3,11 +3,12 @@ import { computed } from "vue";
 import Frac from "./Frac.vue";
 import StatusBadge from "./StatusBadge.vue";
 import type { Fraction, Simulation } from "../engine/types";
-import { complement, count, within } from "../format";
+import { complement, count, counted, within } from "../format";
 
 // The result of a run in three plain statements: the estimate, the exact
 // answer from the maths, and whether the estimate fell inside its band.
 const props = defineProps<{ result: Simulation }>();
+const emit = defineEmits<{ "use-required": [required: number] }>();
 
 const subject = computed(() =>
   props.result.chain ? `the chance of ending ${props.result.chain.state} after ${props.result.chain.steps} steps` : "the chance of success per attempt",
@@ -27,15 +28,18 @@ const inside = computed(() => {
 </script>
 
 <template>
-  <div class="border-l-[3px] border-dashed border-estimated pl-3 text-sm">
+  <div class="border-l-[3px] pl-3 text-sm" :class="result.estimate ? 'border-dashed border-estimated' : 'border-rule'">
     <ol class="grid gap-1.5">
       <li class="flex flex-wrap items-center gap-2">
-        <StatusBadge status="estimated" />
+        <StatusBadge v-if="result.estimate" status="estimated" />
         <span v-if="result.estimate">
           Estimate of {{ subject }}: <Frac :value="result.estimate.value" /> &#177; <Frac :value="result.estimate.epsilon" />, with probability at least
           <Frac :value="complement(result.estimate.delta)" />.
         </span>
-        <span v-else>No estimate: {{ count(result.samples) }} runs are fewer than the {{ count(result.requiredSamples) }} it needs.</span>
+        <template v-else>
+          <span>No estimate yet: this simulation used {{ counted(result.samples, "run") }}, and an estimate needs at least {{ counted(result.requiredSamples, "run") }}.</span>
+          <button class="btn py-0.5 text-xs" type="button" @click="emit('use-required', result.requiredSamples)">Use {{ counted(result.requiredSamples, "run") }}</button>
+        </template>
       </li>
       <li v-if="exact">Exact answer, {{ exact.name }}: <Frac :value="exact.value" />.</li>
       <li v-else>No exact answer to compare with: this chain does not settle.</li>
