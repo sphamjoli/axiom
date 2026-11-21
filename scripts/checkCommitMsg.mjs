@@ -18,7 +18,7 @@ const TYPES = [
   "perf",
   "revert",
 ];
-const SCOPES = ["core", "infer", "circuit", "cert", "cli", "lean", "examples", "docs", "ci", "deps", "ui"];
+const SCOPES = ["core", "infer", "circuit", "cert", "model", "cli", "lean", "examples", "docs", "ci", "deps", "ui"];
 const SUBJECT_PATTERN = /^[a-zA-Z][-a-zA-Z0-9 .,():+/]+$/;
 
 const HEADER_PATTERN = new RegExp(
