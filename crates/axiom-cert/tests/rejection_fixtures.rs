@@ -1,4 +1,4 @@
-//! Every file in `tests/fixtures/reject/` breaks exactly one rule of the
+//! Every file in `fixtures/certificates/reject/` breaks exactly one rule of the
 //! version 1 format and must be rejected. The Lean checker is tested against
 //! the same files, so the two readers agree on what is invalid.
 
@@ -10,7 +10,8 @@ use axiom_cert::Certificate;
 
 #[test]
 fn every_rejection_fixture_is_rejected() -> io::Result<()> {
-    let directory = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/reject");
+    let directory =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/certificates/reject");
     let mut checked = 0;
     for entry in fs::read_dir(directory)? {
         let path = entry?.path();

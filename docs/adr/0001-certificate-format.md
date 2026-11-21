@@ -87,7 +87,7 @@ Whitespace between tokens and the order of keys within an object carry no meanin
 
 ## Verification
 
-- `crates/axiom-cert` implements version 1. Its tests include a golden file, `crates/axiom-cert/tests/fixtures/links-mass.json`, which the engine must reproduce byte for byte and which the Lean checker will later parse.
+- `crates/axiom-cert` implements version 1. Its tests include a golden file, `fixtures/certificates/links-mass.json`, which the engine must reproduce byte for byte and which the Lean checker will later parse.
 - Rejection tests cover each rule above: wrong format, unsupported version, unknown and repeated fields, a byte order mark, numbers with a fraction or exponent, non-canonical and over-long numbers, a zero denominator, rows that do not sum to one, a matrix that is empty, not square or larger than 16 states, an empty or repeated claim, claims that refer to a missing row, and oversized input. Further tests confirm that whitespace and key order do not change the result, that a long row of large denominators is rejected before it is summed, and that no error message contains text from the certificate.
 
 ## Related decisions

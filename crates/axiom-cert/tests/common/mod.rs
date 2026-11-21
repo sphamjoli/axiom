@@ -30,7 +30,7 @@ pub enum TestError {
 }
 
 /// The golden certificate for the link model, written by hand.
-pub const LINKS_MASS: &str = include_str!("../fixtures/links-mass.json");
+pub const LINKS_MASS: &str = include_str!("../../../../fixtures/certificates/links-mass.json");
 
 /// The link model: failure probability 1/10, repair probability 3/10.
 pub fn link_chain() -> Result<TwoStateChain, ProbabilityError> {
