@@ -1,8 +1,7 @@
 /-!
 # Certificates
 
-The checker's view of a version 1 certificate, as defined in
-`docs/adr/0001-certificate-format.md`. Values of these types are produced only
+The checker's view of a version 1 certificate. Values of these types are produced only
 by `AxiomCheck.Parse.certificate`, which enforces every rule of the format
 except the arithmetic ones that the checker itself verifies.
 -/

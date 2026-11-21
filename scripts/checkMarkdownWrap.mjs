@@ -1,6 +1,6 @@
 // Fails when a Markdown paragraph is hard-wrapped across multiple source
 // lines instead of written as one line per paragraph. This repository's own
-// convention (used throughout `README.md`, `docs/decision-log.md`, and every
+// convention (used throughout `README.md` and every
 // crate README) lets the renderer or editor wrap prose; a paragraph broken by
 // real newlines in the source renders as a narrow column in any viewer that
 // does not collapse single newlines into a space, and looks inconsistent

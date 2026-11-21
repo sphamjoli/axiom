@@ -89,23 +89,9 @@ The *trusted computing base* is the set of components whose errors could cause a
 
 Finite-state recursions, those whose variables take finitely many values, reduce to systems of linear fixed-point equations, such as $x = 0.3 + 0.7\,x$, and can be solved exactly. Arbitrary recursive probabilistic programs cannot, because their *termination*, whether they eventually stop, is *undecidable* in general: no algorithm answers the question correctly for every program. The language is therefore restricted to structures whose fixed points the engine can compute and the checker can verify. The design keeps further machinery for models built from several components, for example to compute their transition probabilities. It computes the combined distribution of several variables exactly (for two links, the probability of each of the four up/down combinations). It splits that distribution into smaller *factors*, tables that each involve only some of the variables, and compiles it into *sum-product circuits*, networks of weighted sums and products that answer queries quickly.
 
-### System
-
-Components on each side of the trust boundary, and the certificate file that connects them.
-
-![System diagram](docs/system.svg)
-
 ### Typical flow
 
 One planned analysis of the link model. Alice will run the command-line tool `axiom certify links.axm` on her model file; the engine is to check the model, solves for the steady state, derives the contraction factor and convergence bound, and write the certificate `cert.json` in JSON, a structured text format. Bob will run `axiom-check cert.json`; the checker is to rebuild the transition matrix from the embedded model, checks each claim and labels it proven, estimated or rejected.
-
-![Typical flow](docs/flow.svg)
-
-### Overview
-
-The engine stages, the running example and a map of the project's main risks, which the design treats as the growth of unchecked claims and of the trusted computing base. Editable sources for all diagrams are in `docs/*.excalidraw`.
-
-![Architecture, running example and project risks](docs/architecture.svg)
 
 ## Scope of the proof of concept
 
