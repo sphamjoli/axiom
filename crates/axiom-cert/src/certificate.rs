@@ -122,6 +122,32 @@ impl Interval {
         }
     }
 
+    /// The interval from `lo` to `hi`, each end closed when its flag is
+    /// set: the form a model's parameter bounds take.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CertificateError::InvalidInterval`] when an end is not a
+    /// probability, and [`CertificateError::EmptyInterval`] as
+    /// [`Interval::try_new`] does.
+    pub fn from_bounds(
+        lo: &BigRational,
+        lo_closed: bool,
+        hi: &BigRational,
+        hi_closed: bool,
+    ) -> Result<Self, CertificateError> {
+        let probability = |value: &BigRational| {
+            Probability::try_new(value).map_err(|_| CertificateError::InvalidInterval)
+        };
+        let end = |closed: bool| if closed { End::Closed } else { End::Open };
+        Self::try_new(
+            probability(lo)?,
+            end(lo_closed),
+            probability(hi)?,
+            end(hi_closed),
+        )
+    }
+
     /// The lower end's value.
     #[must_use]
     pub fn lo(&self) -> &Probability {

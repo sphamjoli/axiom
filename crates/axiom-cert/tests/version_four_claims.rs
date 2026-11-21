@@ -190,3 +190,22 @@ proptest! {
         }
     }
 }
+
+/// A model's bounds become the interval with the same values and ends; an
+/// end that is not a probability is refused before the emptiness check.
+#[test]
+fn bounds_become_an_interval_with_the_same_ends() -> Result<(), TestError> {
+    assert_eq!(
+        Interval::from_bounds(&ratio(1, 10), true, &ratio(3, 10), false)?,
+        tenths(1, End::Closed, 3, End::Open)?
+    );
+    assert_eq!(
+        Interval::from_bounds(&ratio(0, 1), false, &ratio(3, 2), true),
+        Err(CertificateError::InvalidInterval)
+    );
+    assert_eq!(
+        Interval::from_bounds(&ratio(1, 2), true, &ratio(1, 2), false),
+        Err(CertificateError::EmptyInterval)
+    );
+    Ok(())
+}

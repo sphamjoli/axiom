@@ -5,10 +5,9 @@ use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 
-use axiom_cert::{Certificate, End, Estimate, Interval, Model, Quantity};
+use axiom_cert::{Certificate, Estimate, Interval, Model, Quantity};
 use axiom_core::Probability;
-use axiom_model::{AffineWeight, Bound, Chain, CheckedModel, MAX_INPUT_BYTES, Parameter};
-use num_traits::{One, Zero};
+use axiom_model::{Chain, CheckedModel, MAX_INPUT_BYTES, Parameter};
 
 use crate::cli::EstimateRequest;
 use crate::error::{CliError, FileRole, IoFailure};
@@ -200,53 +199,20 @@ pub(crate) fn with_sampled_estimate(
 }
 
 /// The ranges of `a` and `b` for a two-state chain whose exit
-/// probabilities are exactly two distinct parameters, `a` from the first
-/// state and `b` from the second, or `None` for any other parametric chain.
-/// The parameters are distinct because the model checker rejects a declared
-/// parameter that is never used, and the diagonal needs no check because the
-/// model checker has shown that every row sums to one.
+/// probabilities are exactly its two parameters, or `None` for any other
+/// parametric chain.
 fn parametric_ranges(chain: &Chain) -> Option<(Interval, Interval)> {
-    let [first, second] = chain.rows.as_slice() else {
-        return None;
+    let (a, b) = chain.two_state_exits()?;
+    let interval = |p: &Parameter| {
+        Interval::from_bounds(
+            &p.lower.value,
+            p.lower.closed,
+            &p.upper.value,
+            p.upper.closed,
+        )
+        .ok()
     };
-    let a = sole_parameter(first.get(1)?)?;
-    let b = sole_parameter(second.first()?)?;
-    if chain.parameters.len() != 2 {
-        return None;
-    }
-    Some((
-        interval(chain.parameters.get(a)?)?,
-        interval(chain.parameters.get(b)?)?,
-    ))
-}
-
-/// The index of the parameter a weight is exactly equal to, if any.
-fn sole_parameter(weight: &AffineWeight) -> Option<usize> {
-    if !weight.constant().is_zero() {
-        return None;
-    }
-    let mut found = None;
-    for (index, coefficient) in weight.coefficients().iter().enumerate() {
-        if coefficient.is_one() && found.is_none() {
-            found = Some(index);
-        } else if !coefficient.is_zero() {
-            return None;
-        }
-    }
-    found
-}
-
-/// A parameter's range as a certificate interval.
-fn interval(parameter: &Parameter) -> Option<Interval> {
-    let end = |bound: &Bound| if bound.closed { End::Closed } else { End::Open };
-    let probability = |bound: &Bound| Probability::try_new(&bound.value).ok();
-    Interval::try_new(
-        probability(&parameter.lower)?,
-        end(&parameter.lower),
-        probability(&parameter.upper)?,
-        end(&parameter.upper),
-    )
-    .ok()
+    Some((interval(a)?, interval(b)?))
 }
 
 /// Reads a model file, refusing files larger than the model size limit

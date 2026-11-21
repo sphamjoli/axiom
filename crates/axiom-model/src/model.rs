@@ -2,7 +2,7 @@
 
 use axiom_core::{Probability, TransitionMatrix};
 use num_rational::BigRational;
-use num_traits::Zero;
+use num_traits::{One, Zero};
 
 /// One end of a parameter's interval.
 ///
@@ -85,6 +85,26 @@ impl AffineWeight {
         self.coefficients.iter().all(Zero::is_zero)
     }
 
+    /// The index of the parameter the weight is exactly equal to: constant
+    /// zero, coefficient one for that parameter and zero for every other.
+    /// `a` gives `Some(0)` with parameters `a` and `b`; `1 - a` and `2*a`
+    /// give `None`.
+    #[must_use]
+    fn sole_parameter(&self) -> Option<usize> {
+        if !self.constant.is_zero() {
+            return None;
+        }
+        let mut found = None;
+        for (index, coefficient) in self.coefficients.iter().enumerate() {
+            if coefficient.is_one() && found.is_none() {
+                found = Some(index);
+            } else if !coefficient.is_zero() {
+                return None;
+            }
+        }
+        found
+    }
+
     /// The value of the weight when parameter `i` takes `values[i]`.
     ///
     /// For `1 - a` and `a = 1/10` the value is `9/10`. Missing values count
@@ -118,6 +138,30 @@ pub struct Chain {
     /// The exact transition matrix, present when the chain has no
     /// parameters.
     pub matrix: Option<TransitionMatrix>,
+}
+
+impl Chain {
+    /// The parameters that are the two exit probabilities of a two-state
+    /// chain: `a`, the weight of moving from the first state to the second,
+    /// and `b`, the weight of moving from the second to the first. `None`
+    /// unless the chain has exactly two states and two parameters and each
+    /// exit weight is exactly one of them.
+    ///
+    /// The two are distinct, because the model checker rejects a declared
+    /// parameter that is never used, and the stay weights need no check,
+    /// because the model checker has shown that every row sums to one.
+    #[must_use]
+    pub fn two_state_exits(&self) -> Option<(&Parameter, &Parameter)> {
+        let [first, second] = self.rows.as_slice() else {
+            return None;
+        };
+        if self.parameters.len() != 2 {
+            return None;
+        }
+        let a = first.get(1)?.sole_parameter()?;
+        let b = second.first()?.sole_parameter()?;
+        Some((self.parameters.get(a)?, self.parameters.get(b)?))
+    }
 }
 
 /// A retry recursion that passed every static check: an attempt that
