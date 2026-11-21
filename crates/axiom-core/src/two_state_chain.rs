@@ -103,12 +103,17 @@ impl TwoStateChain {
     ) -> Result<Option<u64>, TwoStateChainError> {
         let steady = self.steady_state()?;
         let factor = self.contraction_factor().abs();
-        let mut distance = (start - steady.value()).abs();
+        let distance = (start - steady.value()).abs();
+        // Compare |p/q|^n (r/s) <= v/w as p^n r w <= v q^n s on integers, so
+        // each step is one multiplication with no fraction reduction.
+        let mut left = distance.numer() * tolerance.denom();
+        let mut right = tolerance.numer() * distance.denom();
         for steps in 0..=limit {
-            if distance <= *tolerance {
+            if left <= right {
                 return Ok(Some(steps));
             }
-            distance = &distance * &factor;
+            left *= factor.numer();
+            right *= factor.denom();
         }
         Ok(None)
     }
