@@ -25,7 +25,7 @@ fn every_rejection_fixture_is_rejected() -> io::Result<()> {
         );
         checked += 1;
     }
-    assert_eq!(checked, 19, "every fixture is checked");
+    assert_eq!(checked, 23, "every fixture is checked");
     Ok(())
 }
 
@@ -39,6 +39,6 @@ fn every_acceptance_fixture_is_accepted() -> Result<(), Box<dyn std::error::Erro
         Certificate::from_json(&fs::read_to_string(&path)?)?;
         checked += 1;
     }
-    assert_eq!(checked, 2, "every fixture is checked");
+    assert_eq!(checked, 3, "every fixture is checked");
     Ok(())
 }
