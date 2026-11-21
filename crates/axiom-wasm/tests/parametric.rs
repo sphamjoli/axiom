@@ -42,9 +42,10 @@ fn fraction(num: &str, den: &str) -> Value {
     json!({ "num": num, "den": den })
 }
 
-/// `{lo, loClosed, hi, hiClosed}` for an interval open at both ends.
-fn open_range(lo: Value, hi: Value) -> Value {
-    json!({ "lo": lo, "loClosed": false, "hi": hi, "hiClosed": false })
+/// `{lo, loClosed, hi, hiClosed}` for an interval of integers open at both
+/// ends.
+fn open_range(lo: &str, hi: &str) -> Value {
+    json!({ "lo": fraction(lo, "1"), "loClosed": false, "hi": fraction(hi, "1"), "hiClosed": false })
 }
 
 fn at(source: &str, a: (&str, &str), b: (&str, &str)) -> Result<Value, TestError> {
@@ -71,7 +72,7 @@ fn links_param_returns_the_parametric_view_and_certificate() -> Result<(), TestE
         view["a"]["name"] == "a" && view["b"]["name"] == "b",
         "names",
     )?;
-    let unit = open_range(fraction("0", "1"), fraction("1", "1"));
+    let unit = open_range("0", "1");
     ensure(
         view["a"]["range"] == unit && view["b"]["range"] == unit,
         "intervals",
@@ -80,14 +81,8 @@ fn links_param_returns_the_parametric_view_and_certificate() -> Result<(), TestE
         view["steadyState"] == "a/(a+b)" && view["factor"] == "1 - a - b",
         "forms",
     )?;
-    ensure(
-        view["sum"] == open_range(fraction("0", "1"), fraction("2", "1")),
-        "a + b",
-    )?;
-    ensure(
-        view["lambda"] == open_range(fraction("-1", "1"), fraction("1", "1")),
-        "lambda",
-    )?;
+    ensure(view["sum"] == open_range("0", "2"), "a + b")?;
+    ensure(view["lambda"] == open_range("-1", "1"), "lambda")?;
     ensure(
         view["point"]["a"] == fraction("1", "2") && view["point"]["b"] == fraction("1", "2"),
         "midpoint",
