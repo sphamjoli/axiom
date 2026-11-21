@@ -33,13 +33,15 @@ fn exits_follow_the_rows_not_the_declarations() -> Result<(), TestError> {
 }
 
 /// An exit that is a multiple of a parameter, an offset parameter, a fixed
-/// exit or a third state is not the supported shape.
+/// exit, one parameter for both exits or a third state is not the
+/// supported shape.
 #[test]
 fn other_parametric_chains_have_no_exits() -> Result<(), TestError> {
     let models = [
         "param a in ]0, 1[\nparam b in ]0, 1[\nchain c {\n  states s, t\n  from s: s 1 - 1/2*a, t 1/2*a\n  from t: s b, t 1 - b\n}\n",
         "param a in ]0, 1/2[\nparam b in ]0, 1[\nchain c {\n  states s, t\n  from s: s 9/10 - a, t 1/10 + a\n  from t: s b, t 1 - b\n}\n",
         "param a in ]0, 1[\nchain c {\n  states s, t\n  from s: s 1 - a, t a\n  from t: s 1/2, t 1/2\n}\n",
+        "param a in ]0, 1[\nchain c {\n  states s, t\n  from s: s 1 - a, t a\n  from t: s a, t 1 - a\n}\n",
         "param a in ]0, 1[\nparam b in ]0, 1[\nchain c {\n  states s, t, u\n  from s: s 1 - a, t a\n  from t: s b, t 1 - b\n  from u: u 1\n}\n",
     ];
     for model in models {
