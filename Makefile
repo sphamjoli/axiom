@@ -1,4 +1,4 @@
-.PHONY: bench demo engine-subset engine-install engine-translate engine-check rust-test-without-lean cli-lean-test cli-demo ui-check lean-test rust-deny help hooks-install check fmt rust-fmt rust-lint rust-test rust-doc lean-build lean-check lean-cache lean-audit
+.PHONY: bench coverage demo engine-subset engine-install engine-translate engine-check rust-test-without-lean cli-lean-test cli-demo ui-check lean-test rust-deny help hooks-install check fmt rust-fmt rust-lint rust-test rust-doc lean-build lean-check lean-cache lean-audit
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | sed 's/:.*## /\t/'
@@ -70,6 +70,9 @@ cli-demo: ## Write the golden certificate from links.axm and check it with the L
 
 ui-check: ## Install the web interface dependencies, typecheck it and build it
 	cd ui && bun install --frozen-lockfile && bun run typecheck && bun run build
+
+coverage: ## Write bench/coverage.md and bench/coverage.csv; fails on any sorry
+	cargo run --locked -q -p axiom-bench --bin axiom-coverage -- --root . --out bench
 
 bench: ## Measure the engine, the Lean checker and simulation, and write bench/ (requires lake)
 	cargo run --release --locked -q -p axiom-bench -- --out bench

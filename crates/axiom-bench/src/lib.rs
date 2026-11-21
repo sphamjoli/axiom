@@ -6,6 +6,7 @@
 //! writes the measurements as CSV, a Markdown table and SVG plots.
 
 pub mod cases;
+pub mod coverage;
 pub mod engine;
 pub mod error;
 pub mod report;

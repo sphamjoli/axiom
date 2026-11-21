@@ -10,6 +10,10 @@ publish.workspace = true
 name = "axiom-bench"
 path = "src/main.rs"
 
+[[bin]]
+name = "axiom-coverage"
+path = "src/bin/coverage.rs"
+
 [dependencies]
 axiom-cert = { workspace = true }
 axiom-cli = { workspace = true }
