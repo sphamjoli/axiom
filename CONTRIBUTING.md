@@ -77,7 +77,7 @@ A hook whose script cannot find a JavaScript runtime skips instead of failing, s
 
 ## Commits
 
-Each commit message is a single line of the form `type(scope): subject`, with no body. The type is one of `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `ci`, `perf` and `revert`. The scope is optional and is one of `core`, `infer`, `circuit`, `cert`, `cli`, `lean`, `examples`, `docs`, `ci` and `deps`. The subject starts with a letter and states what changed, for example `fix(cert): reject certificates whose rows do not sum to one`. Commits carry no co-author trailers.
+Each commit message is a single line of the form `type(scope): subject`, with no body. The type is one of `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `ci`, `perf` and `revert`. The scope is optional and is one of `core`, `infer`, `circuit`, `cert`, `cli`, `lean`, `examples`, `docs`, `ci`, `deps` and `ui`. The subject starts with a letter and states what changed, for example `fix(cert): reject certificates whose rows do not sum to one`. Commits carry no co-author trailers.
 
 Local planning notes belong in `.local/`, which Git ignores. They are never committed.
 
