@@ -5,8 +5,8 @@ import AxiomCheck
 
 Reads the certificate whose path is the single argument, parses it with
 `AxiomCheck.Parse.certificate` and decides each claim with
-`AxiomCheck.Check.checkMass`. Prints one line per claim, of the form
-`claim 0 Mass row 0: accepted` or `claim 0 Mass row 0: rejected`. Exits with
+`AxiomCheck.Check.checkClaim`. Prints one line per claim, such as
+`claim 0 Mass row 0: accepted` or `claim 2 FixedPoint: rejected`. Exits with
 status 0 when every claim is accepted, 1 when some claim is rejected, and 2
 when the arguments are wrong or the certificate cannot be read or parsed.
 `axiom check` runs it through the Lean interpreter (`lake env lean` in run
@@ -19,16 +19,18 @@ namespace AxiomCheckCli
 
 /-- The line reporting the verdict on claim `index`. -/
 def verdictLine (index : Nat) (claim : Claim) (accepted : Bool) : String :=
+  let verdict := if accepted then "accepted" else "rejected"
   match claim with
-  | .mass row =>
-    s!"claim {index} Mass row {row}: {if accepted then "accepted" else "rejected"}"
+  | .mass row => s!"claim {index} Mass row {row}: {verdict}"
+  | .fixedPoint _ => s!"claim {index} FixedPoint: {verdict}"
+  | .contraction _ => s!"claim {index} Contraction: {verdict}"
 
 /-- Decides every claim, printing one verdict line each, and returns the exit
 status: 0 if all are accepted, 1 otherwise. -/
 def report (certificate : Certificate) : IO UInt32 := do
   let mut allAccepted := true
   for (claim, index) in certificate.claims.zipIdx do
-    let accepted := Check.checkMass certificate claim
+    let accepted := Check.checkClaim certificate claim
     IO.println (verdictLine index claim accepted)
     allAccepted := allAccepted && accepted
   pure (if allAccepted then 0 else 1)

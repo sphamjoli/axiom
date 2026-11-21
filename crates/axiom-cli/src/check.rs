@@ -162,11 +162,16 @@ fn parse_output(stdout: &str) -> Result<Vec<Verdict>, CliError> {
     Ok(verdicts)
 }
 
-/// Whether `text` has the form `claim <n> Mass row <r>`.
+/// Whether `text` has the form `claim <n> Mass row <r>`, `claim <n>
+/// FixedPoint` or `claim <n> Contraction`.
 fn is_claim(text: &str) -> bool {
     let words: Vec<&str> = text.split(' ').collect();
     let number = |word: &str| !word.is_empty() && word.bytes().all(|b| b.is_ascii_digit());
-    matches!(words.as_slice(), ["claim", index, "Mass", "row", row] if number(index) && number(row))
+    match words.as_slice() {
+        ["claim", index, "Mass", "row", row] => number(index) && number(row),
+        ["claim", index, "FixedPoint" | "Contraction"] => number(index),
+        _ => false,
+    }
 }
 
 /// The checker's own error message if it printed one, otherwise a short

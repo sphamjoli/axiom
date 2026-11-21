@@ -27,6 +27,7 @@ name = "axiom-cli"
 version = "0.1.0"
 dependencies = [
  "axiom-cert",
+ "axiom-core",
  "axiom-model",
  "thiserror",
 ]

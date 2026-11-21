@@ -9,7 +9,7 @@ use common::{TestError, axiom, ensure, repo_root, scratch};
 #[test]
 fn reproduces_golden_certificate() -> Result<(), TestError> {
     let dir = scratch("golden")?;
-    let out = dir.join("links-mass.json");
+    let out = dir.join("links-fixed-point.json");
     let model = repo_root().join("fixtures/models/links.axm");
     let output = axiom(&[
         OsStr::new("analyse"),
@@ -19,7 +19,7 @@ fn reproduces_golden_certificate() -> Result<(), TestError> {
     ])?;
     ensure(output.status.code() == Some(0), "analyse failed")?;
     let written = std::fs::read(&out)?;
-    let golden = std::fs::read(repo_root().join("fixtures/certificates/links-mass.json"))?;
+    let golden = std::fs::read(repo_root().join("fixtures/certificates/links-fixed-point.json"))?;
     ensure(
         written == golden,
         "certificate differs from the golden file",
