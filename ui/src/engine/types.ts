@@ -90,4 +90,98 @@ export type AnalyzeResult =
 
 export interface Engine {
   analyze(source: string): Promise<AnalyzeResult>;
+  simulate(source: string, request: SimulateRequest): Promise<SimulateResult>;
 }
+
+// The caps crates/axiom-wasm enforces on a simulation request. The page
+// bounds its inputs by them; the engine refuses anything past them.
+export const SIM_CAPS = {
+  samples: 200_000,
+  steps: 1000,
+  attempts: 1000,
+} as const;
+
+// A simulation request. The seed is a decimal string because a JavaScript
+// number cannot hold every 64-bit seed.
+export interface SimulateRequest {
+  seed: string;
+  samples: number;
+  steps: number;
+  maxAttempts: number;
+}
+
+// A Hoeffding estimate: with probability at least 1 - delta over the
+// sampling, the true value lies within epsilon of value. Never a proof.
+export interface Estimate {
+  value: Fraction;
+  approx: number;
+  samples: number;
+  epsilon: Fraction;
+  delta: Fraction;
+  certainty: "estimated";
+}
+
+export interface RunningPoint {
+  samples: number;
+  approx: number;
+}
+
+export interface ChainRun {
+  states: string[];
+  // The state whose fraction is tracked, the second one.
+  state: string;
+  steps: number;
+  // Up to five paths of state indices, at most 201 entries each.
+  paths: number[][];
+  // The fraction of the first `samples` runs that end in `state`.
+  running: RunningPoint[];
+  fraction: Fraction;
+  // Null when the chain has no steady state it settles to.
+  steadyState: Fraction | null;
+  steadyApprox: number | null;
+}
+
+export interface Bucket {
+  attempts: number;
+  count: number;
+}
+
+export interface RetryRun {
+  maxAttempts: number;
+  success: Fraction;
+  histogram: Bucket[];
+  // Runs that succeeded after the last bucket.
+  beyond: number;
+  // Runs that had not succeeded within maxAttempts.
+  failures: number;
+  successFraction: Fraction;
+  meanAttempts: Fraction | null;
+  meanApprox: number | null;
+  expectedAttempts: Fraction | null;
+  expectedApprox: number | null;
+}
+
+export interface Simulation {
+  name: string;
+  seed: string;
+  samples: number;
+  // The samples the Hoeffding bound needs for epsilon and delta.
+  requiredSamples: number;
+  epsilon: Fraction;
+  delta: Fraction;
+  // Null when samples < requiredSamples.
+  estimate: Estimate | null;
+  chain: ChainRun | null;
+  retry: RetryRun | null;
+}
+
+export interface SimulationError {
+  code: string;
+  message: string;
+  line: number | null;
+  column: number | null;
+}
+
+export type SimulateResult =
+  | { ok: true; simulation: Simulation }
+  | { ok: false; error: SimulationError };

@@ -4,6 +4,7 @@ import CertificatePanel from "./components/CertificatePanel.vue";
 import ConvergencePlot from "./components/ConvergencePlot.vue";
 import Frac from "./components/Frac.vue";
 import ModelEditor from "./components/ModelEditor.vue";
+import SimulatePanel from "./components/SimulatePanel.vue";
 import TransitionGraph from "./components/TransitionGraph.vue";
 import { LINKS_MODEL } from "./engine/models";
 import type { Analysis, Diagnostic, Engine } from "./engine/types";
@@ -77,6 +78,13 @@ watchEffect(() => document.documentElement.classList.toggle("dark", dark.value))
           </dd>
         </dl>
       </section>
+      <SimulatePanel
+        v-if="analysis?.chain || analysis?.retry"
+        :engine="engine"
+        :source="source"
+        :kind="analysis.chain ? 'chain' : 'retry'"
+        class="lg:col-span-2"
+      />
     </main>
   </div>
 </template>
