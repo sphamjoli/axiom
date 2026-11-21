@@ -133,6 +133,25 @@ pub fn retry_probability(retry: &Retry) -> Result<&Probability, SimError> {
     retry.probability.as_ref().ok_or(SimError::Parametric)
 }
 
+/// The cumulative thresholds of every row of `matrix`, after checking that
+/// `start` is one of its states.
+fn chain_cuts(matrix: &TransitionMatrix, start: usize) -> Result<Vec<Vec<Threshold>>, SimError> {
+    if start >= matrix.states() {
+        return Err(SimError::StateOutOfRange(start));
+    }
+    Ok(matrix
+        .rows()
+        .iter()
+        .map(|row| row_thresholds(row.probabilities()))
+        .collect())
+}
+
+/// The state after `state`, chosen by one draw of `rng`.
+fn step(cuts: &[Vec<Threshold>], state: usize, rng: &mut SplitMix64) -> usize {
+    let draw = rng.next_u64();
+    cuts.get(state).map_or(state, |row| choose(row, draw))
+}
+
 /// Runs `samples` independent trajectories of `steps` steps from state
 /// `start`, with one draw of a [`SplitMix64`] seeded by `seed` per step.
 ///
@@ -146,25 +165,49 @@ pub fn sample_chain(
     samples: usize,
     seed: u64,
 ) -> Result<ChainSamples, SimError> {
-    if start >= matrix.states() {
-        return Err(SimError::StateOutOfRange(start));
-    }
-    let cuts: Vec<Vec<Threshold>> = matrix
-        .rows()
-        .iter()
-        .map(|row| row_thresholds(row.probabilities()))
-        .collect();
+    let cuts = chain_cuts(matrix, start)?;
     let mut rng = SplitMix64::new(seed);
     let mut final_states = Vec::with_capacity(samples);
     for _ in 0..samples {
         let mut state = start;
         for _ in 0..steps {
-            let draw = rng.next_u64();
-            state = cuts.get(state).map_or(state, |row| choose(row, draw));
+            state = step(&cuts, state, &mut rng);
         }
         final_states.push(state);
     }
     Ok(ChainSamples { final_states })
+}
+
+/// Runs `paths` independent trajectories of `steps` steps from state
+/// `start` and keeps every state they visit: each path has `steps + 1`
+/// entries, starting with `start`. The draws are those of
+/// [`sample_chain`] with the same seed, so path `k` ends in the final state
+/// of sample `k`.
+///
+/// # Errors
+///
+/// [`SimError::StateOutOfRange`] when `start` is not a state of the chain.
+pub fn sample_paths(
+    matrix: &TransitionMatrix,
+    start: usize,
+    steps: usize,
+    paths: usize,
+    seed: u64,
+) -> Result<Vec<Vec<usize>>, SimError> {
+    let cuts = chain_cuts(matrix, start)?;
+    let mut rng = SplitMix64::new(seed);
+    let mut all = Vec::with_capacity(paths);
+    for _ in 0..paths {
+        let mut state = start;
+        let mut path = Vec::with_capacity(steps.saturating_add(1));
+        path.push(state);
+        for _ in 0..steps {
+            state = step(&cuts, state, &mut rng);
+            path.push(state);
+        }
+        all.push(path);
+    }
+    Ok(all)
 }
 
 /// Runs `samples` independent retries, each repeating an attempt that

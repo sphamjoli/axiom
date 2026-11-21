@@ -6,7 +6,7 @@ mod common;
 use axiom_core::Probability;
 use axiom_sim::{
     SimError, SplitMix64, Threshold, chain_matrix, required_samples, retry_probability,
-    sample_chain, sample_retry,
+    sample_chain, sample_paths, sample_retry,
 };
 use common::{TestError, ensure, links, ratio, retry};
 use num_bigint::BigInt;
@@ -72,6 +72,39 @@ fn chain_samples_are_reproducible_from_the_seed() -> Result<(), TestError> {
     let other = sample_chain(matrix, 0, 20, 200, 8)?;
     ensure(first == again, "same seed, same samples")?;
     ensure(first != other, "different seed, different samples")
+}
+
+/// A path keeps every visited state from the start, and its draws are the
+/// ones `sample_chain` makes, so each path ends where the matching sample
+/// does.
+#[test]
+fn paths_start_at_the_start_and_end_at_the_matching_sample() -> Result<(), TestError> {
+    let chain = links()?;
+    let matrix = chain_matrix(&chain)?;
+    let paths = sample_paths(matrix, 0, 20, 5, 7)?;
+    let samples = sample_chain(matrix, 0, 20, 5, 7)?;
+    ensure(paths.len() == 5, "five paths")?;
+    ensure(
+        paths
+            .iter()
+            .all(|path| path.len() == 21 && path.first() == Some(&0)),
+        "each path has 21 states from state 0",
+    )?;
+    let ends: Vec<usize> = paths
+        .iter()
+        .filter_map(|path| path.last().copied())
+        .collect();
+    ensure(ends == samples.final_states, "paths end at the samples")
+}
+
+#[test]
+fn paths_refuse_an_out_of_range_start() -> Result<(), TestError> {
+    let chain = links()?;
+    let result = sample_paths(chain_matrix(&chain)?, 2, 1, 1, 0);
+    ensure(
+        result == Err(SimError::StateOutOfRange(2)),
+        "state 2 is refused",
+    )
 }
 
 #[test]

@@ -37,5 +37,5 @@ pub use hoeffding::{
 pub use rng::SplitMix64;
 pub use sample::{
     ChainSamples, RetrySamples, Threshold, chain_matrix, retry_probability, sample_chain,
-    sample_retry,
+    sample_paths, sample_retry,
 };
