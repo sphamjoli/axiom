@@ -74,6 +74,7 @@ v1-contraction.json	ClaimNeedsVersion	claim kind needs certificate version 2
 v1-fixed-point.json	ClaimNeedsVersion	claim kind needs certificate version 2
 v2-convergence-bound.json	ClaimNeedsVersion	claim kind needs certificate version 3
 v2-retry-model.json	ModelNeedsVersion	retry model needs certificate version 3
+v2-termination.json	ClaimNeedsVersion	claim kind needs certificate version 3
 version-exponent.json	Json	invalid JSON at character 44: only plain integers are allowed
 version-four.json	UnsupportedVersion	unsupported certificate version
 version-negative-zero.json	Json	invalid JSON at character 40: unexpected character
