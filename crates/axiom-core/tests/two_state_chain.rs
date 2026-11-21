@@ -2,7 +2,7 @@
 
 mod common;
 
-use axiom_core::{Probability, TwoStateChain};
+use axiom_core::{Probability, TwoStateChain, TwoStateChainError};
 use common::{TestError, probability, ratio};
 use num_rational::BigRational;
 use num_traits::{One, Zero};
@@ -120,5 +120,47 @@ proptest! {
         let d = d.value().clone();
         let by_matrix = (BigRational::one() - &d) * &rows[0][1] + &d * &rows[1][1];
         prop_assert_eq!(chain.second_state_update().apply(&d), by_matrix);
+    }
+}
+
+#[test]
+fn link_model_steady_state_is_one_quarter() -> Result<(), TestError> {
+    let chain = link_chain()?;
+    assert_eq!(chain.steady_state()?.value(), &ratio(1, 4));
+    assert_eq!(chain.contraction_factor(), ratio(3, 5));
+    Ok(())
+}
+
+#[test]
+fn periodic_chain_has_factor_minus_one_and_steady_state_one_half() -> Result<(), TestError> {
+    let chain = TwoStateChain::new(probability(1, 1)?, probability(1, 1)?);
+    assert_eq!(chain.contraction_factor(), ratio(-1, 1));
+    assert_eq!(chain.steady_state()?.value(), &ratio(1, 2));
+    Ok(())
+}
+
+#[test]
+fn a_chain_that_never_moves_has_no_unique_steady_state() -> Result<(), TestError> {
+    let chain = TwoStateChain::new(probability(0, 1)?, probability(0, 1)?);
+    assert_eq!(
+        chain.steady_state(),
+        Err(TwoStateChainError::NoUniqueFixedPoint)
+    );
+    Ok(())
+}
+
+proptest! {
+    #[test]
+    fn the_steady_state_is_a_fixed_point_of_the_update(
+        (a, b) in (0_i64..=1000, 1_i64..=1000, 0_i64..=1000, 1_i64..=1000)
+            .prop_filter_map("both must be probabilities and not both zero", |(an, ad, bn, bd)| {
+                let a = Probability::try_from_fraction(an, ad).ok()?;
+                let b = Probability::try_from_fraction(bn, bd).ok()?;
+                (an != 0 || bn != 0).then_some((a, b))
+            })
+    ) {
+        let chain = TwoStateChain::new(a, b);
+        let steady = chain.steady_state()?;
+        prop_assert_eq!(chain.second_state_update().apply(steady.value()), steady.value().clone());
     }
 }

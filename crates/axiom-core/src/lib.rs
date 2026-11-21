@@ -16,4 +16,4 @@ pub use affine_update::AffineUpdate;
 pub use probability::{Probability, ProbabilityError};
 pub use transition_matrix::{TransitionMatrix, TransitionMatrixError};
 pub use transition_row::{TransitionRow, TransitionRowError};
-pub use two_state_chain::TwoStateChain;
+pub use two_state_chain::{TwoStateChain, TwoStateChainError};

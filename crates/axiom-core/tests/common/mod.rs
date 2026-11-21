@@ -5,7 +5,9 @@
     reason = "each test binary compiles this module and uses only some of its items"
 )]
 
-use axiom_core::{Probability, ProbabilityError, TransitionMatrixError, TransitionRowError};
+use axiom_core::{
+    Probability, ProbabilityError, TransitionMatrixError, TransitionRowError, TwoStateChainError,
+};
 use num_bigint::BigInt;
 use num_rational::BigRational;
 use thiserror::Error;
@@ -23,6 +25,9 @@ pub enum TestError {
     /// A matrix used by the test is not a transition matrix.
     #[error(transparent)]
     TransitionMatrix(#[from] TransitionMatrixError),
+    /// A chain used by the test has no unique steady state.
+    #[error(transparent)]
+    TwoStateChain(#[from] TwoStateChainError),
     /// An iterator ended before the requested term.
     #[error("sequence ended before term {0}")]
     MissingTerm(usize),

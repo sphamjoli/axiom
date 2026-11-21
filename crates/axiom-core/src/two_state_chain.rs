@@ -1,4 +1,18 @@
+use num_rational::BigRational;
+use num_traits::Zero;
+use thiserror::Error;
+
 use crate::{AffineUpdate, Probability, TransitionMatrix, TransitionRow};
+
+/// The reason a two-state chain has no unique steady state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
+#[non_exhaustive]
+pub enum TwoStateChainError {
+    /// Both exit probabilities are zero, so the chain never moves and every
+    /// distribution is a fixed point.
+    #[error("chain never leaves either state, so it has no unique fixed point")]
+    NoUniqueFixedPoint,
+}
 
 /// A chain with two states that moves between them at fixed probabilities.
 ///
@@ -37,7 +51,28 @@ impl TwoStateChain {
     /// `d' = (1 - b) d + a (1 - d) = (1 - a - b) d + a`.
     #[must_use]
     pub fn second_state_update(&self) -> AffineUpdate {
-        let factor = self.leave_first.complement().value() - self.leave_second.value();
-        AffineUpdate::new(factor, self.leave_first.value().clone())
+        AffineUpdate::new(self.contraction_factor(), self.leave_first.value().clone())
+    }
+
+    /// The contraction factor `1 - a - b` of [`Self::second_state_update`],
+    /// which lies in `[-1, 1]`.
+    #[must_use]
+    pub fn contraction_factor(&self) -> BigRational {
+        self.leave_first.complement().value() - self.leave_second.value()
+    }
+
+    /// The unique steady-state probability of occupying the second state,
+    /// `d* = c / (1 - lambda) = a / (a + b)`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TwoStateChainError::NoUniqueFixedPoint`] when `a + b = 0`.
+    pub fn steady_state(&self) -> Result<Probability, TwoStateChainError> {
+        let total = self.leave_first.value() + self.leave_second.value();
+        if total.is_zero() {
+            return Err(TwoStateChainError::NoUniqueFixedPoint);
+        }
+        Probability::try_new(&(self.leave_first.value() / total))
+            .map_err(|_| TwoStateChainError::NoUniqueFixedPoint)
     }
 }
