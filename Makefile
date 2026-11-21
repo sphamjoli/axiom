@@ -1,4 +1,4 @@
-.PHONY: rust-test-without-lean cli-lean-test cli-demo ui-check lean-test rust-deny help hooks-install check fmt rust-fmt rust-lint rust-test rust-doc lean-build lean-check lean-cache lean-audit
+.PHONY: engine-subset engine-install engine-translate engine-check rust-test-without-lean cli-lean-test cli-demo ui-check lean-test rust-deny help hooks-install check fmt rust-fmt rust-lint rust-test rust-doc lean-build lean-check lean-cache lean-audit
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | sed 's/:.*## /\t/'
@@ -7,7 +7,7 @@ hooks-install: ## Install the lefthook git hooks and the gate script dependencie
 	bun install
 	bunx lefthook install
 
-check: rust-fmt rust-lint rust-test rust-doc lean-check lean-build lean-test lean-audit ui-check ## Everything CI runs
+check: rust-fmt rust-lint rust-test rust-doc lean-check lean-build lean-test lean-audit engine-subset engine-translate engine-check ui-check ## Everything CI runs
 
 fmt: ## Format Rust sources in place
 	cargo fmt --all
@@ -47,6 +47,19 @@ lean-test: ## Run the Lean checker tests against the shared fixtures
 
 lean-audit: lean-cache ## Fail unless every checker declaration uses only the standard axioms
 	./scripts/checkLeanAxioms.sh
+
+engine-subset: ## Fast check that the proof 3 functions stay in the translatable subset
+	./scripts/checkProof3.sh
+
+engine-install: ## Fetch the Charon and Aeneas release pinned in proof3.toml into .aeneas/
+	./scripts/installAeneas.sh
+
+engine-translate: ## Fail unless Charon and Aeneas regenerate the committed Lean translation
+	./scripts/checkProof3.sh --translate
+
+engine-check: ## Build the proof 3 Lean project and audit its axioms
+	cd lean-engine && lake exe cache get
+	./scripts/checkEngine.sh
 
 cli-demo: ## Write the golden certificate from links.axm and check it with the Lean checker
 	cargo run -q -p axiom-cli -- analyse fixtures/models/links.axm --cert target/links-mass.json

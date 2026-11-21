@@ -77,6 +77,29 @@ jobs:
       - name: axiom check through the Lean checker
         run: make cli-lean-test
 
+  engine:
+    name: engine proofs (proof 3)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Covered functions stay in the translatable subset
+        run: ./scripts/checkProof3.sh
+      # Fetches the Charon and Aeneas release pinned in proof3.toml, verified
+      # against the SHA-256 in the script, and the Rust nightly Charon drives.
+      - name: Install the pinned Charon and Aeneas
+        run: ./scripts/installAeneas.sh
+      - name: Regenerated Lean equals the committed translation
+        run: ./scripts/checkProof3.sh --translate
+      - uses: leanprover/lean-action@ba3fdfe5c4476c925da13bf11a005ddb47e47aee # v1.7.1
+        with:
+          lake-package-directory: lean-engine
+          use-mathlib-cache: true
+      - name: Engine proofs build and use only the standard axioms
+        run: ./scripts/checkEngine.sh
+
   gates:
     name: source gates
     runs-on: ubuntu-latest
@@ -122,7 +145,7 @@ jobs:
   ci:
     name: CI summary
     if: ${{ always() }}
-    needs: [fmt, rust, docs, lean, gates, ui]
+    needs: [fmt, rust, docs, lean, engine, gates, ui]
     runs-on: ubuntu-latest
     steps:
       - name: Write summary
@@ -131,6 +154,7 @@ jobs:
           RUST_RESULT: ${{ needs.rust.result }}
           DOCS_RESULT: ${{ needs.docs.result }}
           LEAN_RESULT: ${{ needs.lean.result }}
+          ENGINE_RESULT: ${{ needs.engine.result }}
           GATES_RESULT: ${{ needs.gates.result }}
           UI_RESULT: ${{ needs.ui.result }}
         run: |
@@ -143,6 +167,7 @@ jobs:
             echo "| rust | ${RUST_RESULT} |"
             echo "| rustdoc | ${DOCS_RESULT} |"
             echo "| lean | ${LEAN_RESULT} |"
+            echo "| engine proofs | ${ENGINE_RESULT} |"
             echo "| source gates | ${GATES_RESULT} |"
             echo "| ui | ${UI_RESULT} |"
           } >> "$GITHUB_STEP_SUMMARY"
