@@ -1,6 +1,12 @@
+import AxiomCheck.Certificate
+import AxiomCheck.Json
+import AxiomCheck.Parse
+
 /-!
 # AxiomCheck
 
-Root module of the independent certificate checker. It is intentionally empty
-until the formal semantics for the finite probabilistic language is written.
+The independent certificate checker. `AxiomCheck.Parse.certificate` reads a
+version 1 certificate with a strict JSON reader and enforces the format's
+structural rules. The formal semantics and the claim checks are still to be
+written.
 -/
