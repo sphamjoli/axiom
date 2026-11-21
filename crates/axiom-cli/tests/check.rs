@@ -55,7 +55,7 @@ fn lean_malformed_certificate_exits_with_status_two() -> Result<(), TestError> {
     let output = check(&repo_root().join("fixtures/certificates/reject/duplicate-key.json"))?;
     ensure(output.status.code() == Some(2), "expected exit status 2")?;
     ensure(
-        output.stderr == b"axiom: checker-invalid-certificate: the checker refused the certificate as invalid\n",
+        output.stderr == b"axiom: checker-unexpected-field: the checker refused the certificate: unexpected or missing field\n",
         "missing mapped checker error",
     )
 }

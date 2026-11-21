@@ -9,6 +9,7 @@ use std::collections::BTreeSet;
 use std::io;
 
 use axiom_cert::CertificateError;
+use axiom_cli::checker_rule::CheckerRule;
 use axiom_cli::error::{CheckerReason, CliError, FileRole, IoFailure};
 use axiom_cli::outcome::Outcome;
 use axiom_model::{ModelError, Position};
@@ -191,14 +192,111 @@ fn every_checker_error_line_maps_to_its_reason() -> Result<(), TestError> {
             "expected exactly one argument, the certificate path",
             CheckerReason::Arguments,
         ),
+        ("a reason no checker prints", CheckerReason::Invalid),
         (
-            "invalid JSON at character 3: leading zero",
+            "invalid JSON at character x: leading zero",
             CheckerReason::Invalid,
         ),
-        ("a claim is repeated", CheckerReason::Invalid),
+        (
+            "invalid JSON at character 3: a claim is repeated",
+            CheckerReason::Invalid,
+        ),
+        ("leading zero", CheckerReason::Invalid),
     ];
     for (line, reason) in lines {
         ensure(CheckerReason::from_line(line) == reason, line)?;
+    }
+    Ok(())
+}
+
+#[test]
+fn checker_rules_name_their_rule_with_a_distinct_code() -> Result<(), TestError> {
+    let cases = [
+        (
+            "invalid JSON at character 3: leading zero",
+            "checker-json-leading-zero",
+            "axiom: checker-json-leading-zero: the checker refused the certificate: leading zero",
+        ),
+        (
+            "a claim is repeated",
+            "checker-duplicate-claim",
+            "axiom: checker-duplicate-claim: the checker refused the certificate: a claim is repeated",
+        ),
+    ];
+    for (line, code, report) in cases {
+        let error = CliError::CheckerRefused(CheckerReason::from_line(line));
+        ensure(error.code() == code && error.report() == report, line)?;
+        ensure(error.outcome() == Outcome::Refused, line)?;
+    }
+    let codes: BTreeSet<&str> = CheckerRule::ALL.iter().map(|rule| rule.code()).collect();
+    let texts: BTreeSet<&str> = CheckerRule::ALL.iter().map(|rule| rule.text()).collect();
+    ensure(
+        codes.len() == CheckerRule::ALL.len() && texts.len() == CheckerRule::ALL.len(),
+        "rule codes and texts are distinct",
+    )
+}
+
+/// The reason strings the Lean reader can print, taken from its source:
+/// every string literal in an `.error` or a `throw` there.
+fn lean_reasons() -> Result<BTreeSet<String>, TestError> {
+    let mut reasons = BTreeSet::new();
+    for file in ["lean/AxiomCheck/Parse.lean", "lean/AxiomCheck/Json.lean"] {
+        let source = std::fs::read_to_string(common::repo_root().join(file))?;
+        for line in source.lines() {
+            let Some(at) = line.find(".error ").or_else(|| line.find("throw ")) else {
+                continue;
+            };
+            let Some((_, rest)) = line[at..].split_once('"') else {
+                continue;
+            };
+            if let Some((text, _)) = rest.split_once('"') {
+                reasons.insert(text.to_owned());
+            }
+        }
+    }
+    Ok(reasons)
+}
+
+#[test]
+fn every_reason_the_lean_reader_prints_names_a_rule() -> Result<(), TestError> {
+    let reasons = lean_reasons()?;
+    ensure(reasons.len() >= 40, "found the reader's reasons")?;
+    for reason in reasons {
+        if reason == "certificate is too large" || reason.starts_with("invalid JSON at character") {
+            continue;
+        }
+        let line = match reason.as_str() {
+            "claim kind needs certificate version {needed}" => {
+                for needed in ["2", "3"] {
+                    let line = format!("claim kind needs certificate version {needed}");
+                    ensure(CheckerRule::from_line(&line).is_some(), &line)?;
+                }
+                continue;
+            }
+            text => text.to_owned(),
+        };
+        let json = format!("invalid JSON at character 0: {line}");
+        ensure(
+            CheckerRule::from_line(&line).is_some() || CheckerRule::from_line(&json).is_some(),
+            &line,
+        )?;
+    }
+    Ok(())
+}
+
+#[test]
+fn every_reader_rejection_fixture_names_a_rule() -> Result<(), TestError> {
+    let table = std::fs::read_to_string(
+        common::repo_root().join("fixtures/certificates/reject-reasons.tsv"),
+    )?;
+    for row in table.lines() {
+        let Some(reason) = row.split('\t').nth(2) else {
+            continue;
+        };
+        if reason == "check" {
+            continue;
+        }
+        ensure(CheckerRule::from_line(reason).is_some(), reason)?;
     }
     Ok(())
 }

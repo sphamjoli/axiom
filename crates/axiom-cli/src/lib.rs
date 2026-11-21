@@ -4,6 +4,7 @@
 
 pub mod analyse;
 pub mod check;
+pub mod checker_rule;
 pub mod cli;
 pub mod error;
 pub mod outcome;

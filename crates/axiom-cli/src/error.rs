@@ -6,6 +6,7 @@
 //! checker's error stream. Each error has a stable kebab-case code and is
 //! printed as `axiom: <code>: <message>`.
 
+use crate::checker_rule::CheckerRule;
 use std::fmt;
 use std::io;
 
@@ -104,13 +105,18 @@ pub enum CheckerReason {
     /// The checker was not given exactly one argument.
     #[error("the checker was run with the wrong arguments")]
     Arguments,
-    /// The checker found the certificate malformed or invalid.
+    /// The checker refused the certificate under a named reading rule.
+    #[error("the checker refused the certificate: {0}")]
+    Rule(CheckerRule),
+    /// The checker refused the certificate for a reason this program does
+    /// not know, for example after the checker gained a rule.
     #[error("the checker refused the certificate as invalid")]
     Invalid,
 }
 
 impl CheckerReason {
-    /// Every reason.
+    /// Every reason that names no reading rule; [`CheckerRule::ALL`] lists
+    /// the rest.
     pub const ALL: [Self; 6] = [
         Self::NotRegularFile,
         Self::TooLarge,
@@ -122,7 +128,8 @@ impl CheckerReason {
 
     /// Maps the text after `error: ` on a checker line to a reason. Any text
     /// the checker's reading and argument steps do not print is a parse or
-    /// validation failure, [`CheckerReason::Invalid`].
+    /// validation failure: the [`CheckerRule`] it names, or
+    /// [`CheckerReason::Invalid`] when it names none.
     #[must_use]
     pub fn from_line(reason: &str) -> Self {
         match reason {
@@ -131,7 +138,7 @@ impl CheckerReason {
             "certificate is not UTF-8" => Self::NotUtf8,
             "certificate cannot be read" => Self::Unreadable,
             "expected exactly one argument, the certificate path" => Self::Arguments,
-            _ => Self::Invalid,
+            other => CheckerRule::from_line(other).map_or(Self::Invalid, Self::Rule),
         }
     }
 
@@ -144,6 +151,7 @@ impl CheckerReason {
             Self::NotUtf8 => "checker-not-utf8",
             Self::Unreadable => "checker-unreadable",
             Self::Arguments => "checker-arguments",
+            Self::Rule(rule) => rule.code(),
             Self::Invalid => "checker-invalid-certificate",
         }
     }
@@ -152,9 +160,11 @@ impl CheckerReason {
     /// checker's ability to run.
     const fn outcome(self) -> Outcome {
         match self {
-            Self::NotRegularFile | Self::TooLarge | Self::NotUtf8 | Self::Invalid => {
-                Outcome::Refused
-            }
+            Self::NotRegularFile
+            | Self::TooLarge
+            | Self::NotUtf8
+            | Self::Rule(_)
+            | Self::Invalid => Outcome::Refused,
             Self::Unreadable | Self::Arguments => Outcome::Failed,
         }
     }
