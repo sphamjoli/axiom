@@ -117,6 +117,15 @@ def Retry.successProbability (m : Retry) : Rat := if m.p = 0 then 0 else 1
 /-- The expected number of attempts, `1 / p`, meaningful when `p > 0`. -/
 def Retry.expectedAttempts (m : Retry) : Rat := 1 / m.p
 
+/-- The probability of success within the first `k` attempts: the retry map
+iterated `k` times from zero. -/
+def Retry.successWithin (m : Retry) : Nat → Rat
+  | 0 => 0
+  | k + 1 => m.map (m.successWithin k)
+
+/-- The probability that each of the first `k` attempts fails. -/
+def Retry.failureAfter (m : Retry) (k : Nat) : Rat := 1 - m.successWithin k
+
 /-! ## Claims -/
 
 /-- `Mass`: every entry of the row is a probability and the entries sum to
@@ -138,6 +147,11 @@ def ContractionHolds (m : TwoState) (factor : Rat) : Prop :=
 def ConvergenceBoundCertified (m : TwoState) (start : Rat) (steps : Nat)
     (tolerance : Rat) : Prop :=
   ratAbs (ratPow m.lam steps * (start - m.fixedPoint)) ≤ tolerance
+
+/-- The certified error bound is decidable by exact arithmetic. -/
+instance (m : TwoState) (start : Rat) (steps : Nat) (tolerance : Rat) :
+    Decidable (ConvergenceBoundCertified m start steps tolerance) :=
+  inferInstanceAs (Decidable (_ ≤ _))
 
 /-- `ConvergenceBound`: from `start`, every iterate from step `steps` onward
 is within `tolerance` of the stationary probability. -/
