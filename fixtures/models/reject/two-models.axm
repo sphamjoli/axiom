@@ -1,0 +1,6 @@
+retry a {
+  success 1
+}
+retry b {
+  success 1
+}

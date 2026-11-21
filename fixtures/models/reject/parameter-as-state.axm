@@ -1,0 +1,5 @@
+param a in [0, 1]
+chain links {
+  states up
+  from a: up 1
+}

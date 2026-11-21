@@ -1,0 +1,4 @@
+param a in [1, 0]
+retry request {
+  success a
+}

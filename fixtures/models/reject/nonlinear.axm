@@ -1,0 +1,7 @@
+param a in ]0, 1[
+param b in ]0, 1[
+chain links {
+  states up, down
+  from up:   up 1 - a*b, down a*b
+  from down: up b, down 1 - b
+}

@@ -1,0 +1,7 @@
+# The links model with a = b = 1: every step flips the state, so the chain
+# alternates forever and never settles. Valid syntax, but not convergent.
+chain flip {
+  states up, down
+  from up:   down 1
+  from down: up 1
+}

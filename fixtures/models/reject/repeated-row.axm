@@ -1,0 +1,6 @@
+chain links {
+  states up, down
+  from up:   up 1
+  from down: down 1
+  from up:   down 1
+}

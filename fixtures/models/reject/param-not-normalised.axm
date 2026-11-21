@@ -1,0 +1,6 @@
+param a in ]0, 1/2[
+chain links {
+  states up, down
+  from up:   up 1 - a, down 2*a
+  from down: up 3/10, down 7/10
+}

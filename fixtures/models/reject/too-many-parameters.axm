@@ -1,0 +1,12 @@
+param p0 in [0, 1]
+param p1 in [0, 1]
+param p2 in [0, 1]
+param p3 in [0, 1]
+param p4 in [0, 1]
+param p5 in [0, 1]
+param p6 in [0, 1]
+param p7 in [0, 1]
+param p8 in [0, 1]
+retry r {
+  success 0
+}

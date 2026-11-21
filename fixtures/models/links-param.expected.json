@@ -1,0 +1,18 @@
+{
+  "kind": "chain",
+  "parameters": [
+    { "name": "a", "lower": { "num": "0", "den": "1" }, "lower_closed": false, "upper": { "num": "1", "den": "1" }, "upper_closed": false },
+    { "name": "b", "lower": { "num": "0", "den": "1" }, "lower_closed": false, "upper": { "num": "1", "den": "1" }, "upper_closed": false }
+  ],
+  "states": ["up", "down"],
+  "rows": [
+    [
+      { "constant": { "num": "1", "den": "1" }, "coefficients": { "a": { "num": "-1", "den": "1" } } },
+      { "constant": { "num": "0", "den": "1" }, "coefficients": { "a": { "num": "1", "den": "1" } } }
+    ],
+    [
+      { "constant": { "num": "0", "den": "1" }, "coefficients": { "b": { "num": "1", "den": "1" } } },
+      { "constant": { "num": "1", "den": "1" }, "coefficients": { "b": { "num": "-1", "den": "1" } } }
+    ]
+  ]
+}
