@@ -4,4 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
   plugins: [vue(), tailwindcss()],
+  // Emit every asset as a file, never a data: URI, so the Content-Security-Policy
+  // in index.html can load fonts from 'self' alone.
+  build: { assetsInlineLimit: 0 },
 });
