@@ -54,7 +54,9 @@ const STEADY_STATE_STEPS: usize = 64;
 /// a parametric retry or a parametric chain of another shape, when a
 /// parametric range includes a chain that does not contract, or when the
 /// certificate cannot be written. With `estimate`, it also returns the
-/// sampling errors of [`estimated`].
+/// errors of sampling: `--epsilon` or `--delta` out of range, a parametric
+/// model, a sample count above the format limit or a chain without two
+/// states.
 pub fn run(
     model: &Path,
     cert: &Path,
