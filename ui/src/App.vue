@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, shallowRef, watch, watchEffect } from "vue";
+import { onBeforeUnmount, ref, shallowRef, watch, watchEffect } from "vue";
 import CertificatePanel from "./components/CertificatePanel.vue";
 import ConvergencePlot from "./components/ConvergencePlot.vue";
 import Frac from "./components/Frac.vue";
@@ -15,19 +15,32 @@ const source = ref(LINKS_MODEL);
 const analysis = shallowRef<Analysis | null>(null);
 const diagnostics = ref<Diagnostic[]>([]);
 
-watch(
-  source,
-  async (text) => {
-    const result = await engine.analyze(text);
-    if (result.ok) {
-      analysis.value = result.analysis;
-      diagnostics.value = [];
-    } else {
-      diagnostics.value = result.diagnostics;
-    }
-  },
-  { immediate: true },
-);
+// Analysis runs once on load, then 150 ms after the last keystroke, so typing
+// does not queue an analysis per character. Only the newest run may update
+// the page, so a slow earlier run cannot overwrite a later result.
+const ANALYSIS_DELAY_MS = 150;
+let pending: ReturnType<typeof setTimeout> | undefined;
+let latestRun = 0;
+
+async function runAnalysis(text: string): Promise<void> {
+  latestRun += 1;
+  const run = latestRun;
+  const result = await engine.analyze(text);
+  if (run !== latestRun) return;
+  if (result.ok) {
+    analysis.value = result.analysis;
+    diagnostics.value = [];
+  } else {
+    diagnostics.value = result.diagnostics;
+  }
+}
+
+watch(source, (text) => {
+  clearTimeout(pending);
+  pending = setTimeout(() => void runAnalysis(text), ANALYSIS_DELAY_MS);
+});
+onBeforeUnmount(() => clearTimeout(pending));
+void runAnalysis(source.value);
 
 const dark = ref(window.matchMedia("(prefers-color-scheme: dark)").matches);
 watchEffect(() => document.documentElement.classList.toggle("dark", dark.value));
