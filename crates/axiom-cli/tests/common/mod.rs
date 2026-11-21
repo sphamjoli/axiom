@@ -57,8 +57,12 @@ pub fn axiom(args: &[&std::ffi::OsStr]) -> Result<Output, TestError> {
 /// skipped, or fails when the `CI` environment variable is set, so a CI job
 /// never passes these tests by skipping them.
 pub fn lake_available(test: &str) -> Result<bool, TestError> {
+    // Ask from the Lean project directory, as `axiom check` does: elan picks
+    // the toolchain from its `lean-toolchain` file, and outside it `lake`
+    // fails when no default toolchain is installed, as on CI.
     let found = Command::new("lake")
         .arg("--version")
+        .current_dir(repo_root().join("lean"))
         .output()
         .is_ok_and(|output| output.status.success());
     if !found {
