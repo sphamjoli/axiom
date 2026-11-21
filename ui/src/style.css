@@ -1,0 +1,72 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Six named tokens, each with a light and a dark value. Colours come from the
+ * subject: graph paper and ink, a signal blue for the instrument trace, and
+ * three verdict colours for the checker.
+ */
+:root {
+  --paper: #f3f5f7;
+  --sheet: #ffffff;
+  --ink: #1b2430;
+  --ink-muted: #5a6573;
+  --rule: #d5dae1;
+  --signal: #2457c5;
+  --proven: #0f6e5a;
+  --estimated: #8a5d00;
+  --rejected: #b3261e;
+  --ease-out-snap: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.dark {
+  --paper: #13161b;
+  --sheet: #1a1e25;
+  --ink: #dce1e8;
+  --ink-muted: #9aa4b2;
+  --rule: #2c333d;
+  --signal: #8aaef7;
+  --proven: #5cc7a9;
+  --estimated: #e3b341;
+  --rejected: #f2857d;
+}
+
+@theme inline {
+  --font-display: "IBM Plex Sans Condensed", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --color-paper: var(--paper);
+  --color-sheet: var(--sheet);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-rule: var(--rule);
+  --color-signal: var(--signal);
+  --color-proven: var(--proven);
+  --color-estimated: var(--estimated);
+  --color-rejected: var(--rejected);
+}
+
+@layer components {
+  .panel {
+    @apply rounded-md border border-rule bg-sheet p-4 sm:p-5;
+  }
+  .panel-title {
+    @apply mb-3 font-display text-lg font-semibold text-ink;
+  }
+  .btn {
+    @apply inline-flex items-center rounded-md border border-rule px-3 py-1.5 text-sm font-medium text-ink hover:bg-paper;
+    transition: background-color 160ms var(--ease-out-snap);
+  }
+}
+
+:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn {
+    transition: none;
+  }
+}
