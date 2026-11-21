@@ -59,7 +59,7 @@ On some recent macOS versions the mathlib cache tool fails to start. `make lean-
 
 | Path | Contents |
 | --- | --- |
-| `Cargo.toml`, `crates/` | The Rust engine, a Cargo workspace. `crates/axiom-core` holds exact probabilities, transition rows, two-state chains and affine updates. `crates/axiom-cert` writes and reads certificates in format versions 1 and 2. `crates/axiom-model` reads `.axm` model files: it parses them and runs the static checks of the modelling language. `crates/axiom-sim` samples chains and retries from an exact seed and turns the samples into estimates with a Hoeffding confidence bound; estimates are Estimated, never Proven. `crates/axiom-cli` builds the `axiom` command line program described below. `crates/axiom-wasm` compiles the engine to WebAssembly for the web interface. Each crate keeps its tests in its own `tests/` folder. |
+| `Cargo.toml`, `crates/` | The Rust engine, a Cargo workspace. `crates/axiom-core` holds exact probabilities, transition rows, two-state chains, affine updates and the exact Hoeffding sample-count decision. `crates/axiom-cert` writes and reads certificates in format versions 1 to 4, always writing the lowest version that can express a certificate. `crates/axiom-model` reads `.axm` model files: it parses them and runs the static checks of the modelling language. `crates/axiom-sim` samples chains and retries from an exact seed and turns the samples into estimates with a Hoeffding confidence bound; estimates are Estimated, never Proven. `crates/axiom-cli` builds the `axiom` command line program described below. `crates/axiom-wasm` compiles the engine to WebAssembly for the web interface. Each crate keeps its tests in its own `tests/` folder. |
 | `lean/` | The Lean 4 project for the `AxiomCheck` checker, pinned to Lean v4.19.0 and mathlib v4.19.0. `AxiomCheck/Json.lean` is the strict JSON reader and `AxiomCheck/Parse.lean` the certificate reader; their tests are in `lean/AxiomCheckTest/`. `lean/scripts/AxiomAudit.lean` implements the axiom audit. `lean/AxiomCheckCli/Main.lean` is the entry point that `axiom check` runs. |
 | `fixtures/certificates/` | Certificates shared by the engine's and the checker's tests: a golden file both must read, and rejection fixtures both must reject. |
 | `fixtures/models/` | Model files with hand-computed expected results in sibling `.expected.json` files, and in `reject/` faulty models, each with the fault and its line and column. |
@@ -73,15 +73,16 @@ The `axiom` program is built from `crates/axiom-cli`. Run it with `cargo run -p 
 
 | Command | What it does |
 | --- | --- |
-| `axiom analyse <MODEL> --cert <OUT>` | Reads a model and, for a model without parameters, writes a certificate of the strongest claims the engine can make: a `Mass` claim for every row of a chain, with `FixedPoint`, `Contraction` and `ConvergenceBound` claims for a two-state chain that settles, or a `Termination` claim for a retry loop. Models with parameters are refused, because no claim kind covers them yet. |
-| `axiom check <CERT> [--lean-dir <DIR>] [--timeout-secs <SECONDS>]` | Runs the Lean checker on a certificate and prints one line per claim, such as `claim 0 Mass row 0: accepted`, followed by the number of accepted claims and the time taken. |
+| `axiom analyse <MODEL> --cert <OUT>` | Reads a model and writes a certificate of the strongest claims the engine can make: a `Mass` claim for every row of a chain, with `FixedPoint`, `Contraction` and `ConvergenceBound` claims for a two-state chain that settles; a `ParametricContraction` claim for a two-state chain whose exit probabilities are its two parameters `a` and `b`, provided `0 < a + b < 2` across their whole ranges; or a `Termination` claim for a retry loop. Other parametric models are refused, because no claim kind covers them. |
+| `axiom analyse <MODEL> --cert <OUT> --estimate --seed <U64> [--epsilon <FRACTION>] [--delta <FRACTION>]` | Also samples the model from the seed and adds an `Estimate` claim: the probability of being in the second state after 64 steps from the first for a two-state chain, or of success within 20 attempts for a retry loop. The sample count is the least that meets Hoeffding's bound for the tolerance (default `1/100`) and failure probability (default `1/1000`), at most 10,000,000. Without `--estimate` the certificate is unchanged. |
+| `axiom check <CERT> [--lean-dir <DIR>] [--timeout-secs <SECONDS>]` | Runs the Lean checker on a certificate and prints one line per claim, such as `claim 0 Mass row 0: accepted (proven)` or `claim 5 Estimate: accepted (estimated)`, followed by the number of accepted claims, how many are proven and how many estimated, and the time taken. An accepted `Estimate` claim means only that its sample count satisfies Hoeffding's bound for its tolerance and failure probability; the checker never confirms the estimated value. `axiom check` requires the certainty word to match the claim kind and treats any other line as unexpected checker output. |
 | `axiom --help`, `axiom --version` | Prints the help, which lists the exit codes, or the version. |
 
 The exit codes are stable:
 
 | Code | Meaning |
 | --- | --- |
-| 0 | The command succeeded and every claim was accepted. |
+| 0 | The command succeeded and every claim was accepted, whether proven or estimated. |
 | 1 | The checker rejected at least one claim. |
 | 2 | The model or the certificate was refused as invalid or unsupported. |
 | 3 | An operational failure: a file could not be read or written, or the checker could not run, ran past its time limit or printed something unexpected. |
