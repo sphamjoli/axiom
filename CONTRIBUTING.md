@@ -73,12 +73,23 @@ The `axiom` program is built from `crates/axiom-cli`. Run it with `cargo run -p 
 
 | Command | What it does |
 | --- | --- |
-| `axiom analyse <model.axm> --cert <out.json>` | Reads a model and, for a chain without parameters, writes a certificate with a `Mass` claim for every row. Retry models and chains with parameters are refused with an error, because no claim kind covers them yet. |
-| `axiom check <cert.json>` | Runs the Lean checker on a certificate and prints one line per claim, such as `claim 0 Mass row 0: accepted`, followed by the number of accepted claims and the time taken. |
+| `axiom analyse <MODEL> --cert <OUT>` | Reads a model and, for a model without parameters, writes a certificate of the strongest claims the engine can make: a `Mass` claim for every row of a chain, with `FixedPoint`, `Contraction` and `ConvergenceBound` claims for a two-state chain that settles, or a `Termination` claim for a retry loop. Models with parameters are refused, because no claim kind covers them yet. |
+| `axiom check <CERT> [--lean-dir <DIR>] [--timeout-secs <SECONDS>]` | Runs the Lean checker on a certificate and prints one line per claim, such as `claim 0 Mass row 0: accepted`, followed by the number of accepted claims and the time taken. |
+| `axiom --help`, `axiom --version` | Prints the help, which lists the exit codes, or the version. |
 
-The exit status is 0 when the command succeeds and every claim is accepted, 1 when the checker rejects at least one claim, and 2 for a usage error, an unreadable or invalid input, an unsupported model, or a checker that could not be run.
+The exit codes are stable:
 
-`axiom check` runs `lake env lean --run AxiomCheckCli/Main.lean <cert.json>` in the Lean project directory, which is `lean/` in the repository the program was built from unless the `AXIOM_LEAN_DIR` environment variable names another one. It therefore needs `lake` on `PATH` and a built checker (`cd lean && lake build`). The end-to-end tests of `axiom check` print a message and pass without checking anything when `lake` is not on `PATH`.
+| Code | Meaning |
+| --- | --- |
+| 0 | The command succeeded and every claim was accepted. |
+| 1 | The checker rejected at least one claim. |
+| 2 | The model or the certificate was refused as invalid or unsupported. |
+| 3 | An operational failure: a file could not be read or written, or the checker could not run, ran past its time limit or printed something unexpected. |
+| 64 | A usage error: the command line is not a valid command. |
+
+Errors are printed on one line as `axiom: <code>: <message>`, for example `axiom: missing-row: line 2, column 14: state has no row`. The code is a stable kebab-case name, and the message names files by role (model or certificate) and states positions, counts and limits only, so the same failure prints the same bytes on every machine and from every directory. Messages never quote the input, a path, an operating system message or the checker's error stream. A usage error names at most the option it concerns and never repeats what was typed. Model and certificate errors keep the codes of `axiom-model` and `axiom-cert`, which the web interface's diagnostics also use.
+
+`axiom check` runs `lake env lean --run AxiomCheckCli/Main.lean <CERT>` in the Lean project directory, which is `lean/` in the repository the program was built from unless `--lean-dir` or the `AXIOM_LEAN_DIR` environment variable names another one. It therefore needs `lake` on `PATH` and a built checker (`cd lean && lake build`). The checker is killed after 60 seconds unless `--timeout-secs` or `AXIOM_CHECK_TIMEOUT_SECS` sets another limit, a whole number of seconds of at least 1. The checker's `error:` lines are mapped onto codes beginning `checker-`. The end-to-end tests of `axiom check` print a message and pass without checking anything when `lake` is not on `PATH`, unless `CI` is set.
 
 ## Web interface
 
