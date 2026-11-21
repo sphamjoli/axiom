@@ -1,4 +1,0 @@
-# A request that succeeds with probability 3/10 and otherwise repeats itself.
-retry request {
-  success 3/10
-}

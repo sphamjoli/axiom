@@ -1,11 +1,12 @@
 // The model templates the guide teaches with. Their `.axm` text lives in
-// fixtures/models/templates/, which an axiom-model test also reads, so the
+// fixtures/models/templates/ or, for links, parametric links and retry, in
+// fixtures/models/; axiom-model tests read the same files, so the
 // text shown here is the text the engine is tested on.
 import broken from "../../../fixtures/models/templates/broken.axm?raw";
 import flip from "../../../fixtures/models/templates/flip.axm?raw";
-import linksParam from "../../../fixtures/models/templates/links-param.axm?raw";
-import links from "../../../fixtures/models/templates/links.axm?raw";
-import retry from "../../../fixtures/models/templates/retry.axm?raw";
+import linksParam from "../../../fixtures/models/links-param.axm?raw";
+import links from "../../../fixtures/models/links.axm?raw";
+import retry from "../../../fixtures/models/retry.axm?raw";
 import server from "../../../fixtures/models/templates/server.axm?raw";
 import slowRepair from "../../../fixtures/models/templates/slow-repair.axm?raw";
 

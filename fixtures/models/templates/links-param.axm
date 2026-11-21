@@ -1,9 +1,0 @@
-# The links model for every failure probability a and repair probability b
-# strictly between zero and one.
-param a in ]0, 1[
-param b in ]0, 1[
-chain links {
-  states up, down
-  from up:   up 1 - a, down a
-  from down: up b, down 1 - b
-}

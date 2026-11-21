@@ -1,7 +1,9 @@
-//! The model templates the web interface teaches with, in
-//! `fixtures/models/templates/`. The interface imports the same files, so
-//! this test pins what each one teaches: the valid ones parse to the form
-//! the guide describes, and the broken one fails where the guide says.
+//! The model templates the web interface teaches with that are not already
+//! model fixtures, in `fixtures/models/templates/`. The links, parametric
+//! links and retry templates are the fixtures in `fixtures/models/` and are
+//! pinned by `fixtures.rs`. The interface imports the same files, so this
+//! test pins what each one teaches: the valid ones parse to the form the
+//! guide describes, and the broken one fails where the guide says.
 
 mod common;
 
@@ -14,12 +16,10 @@ fn template(name: &str) -> Result<String, TestError> {
 
 /// `(file, states, exact)`: a chain with that many states, and whether it
 /// has an exact matrix (no parameters).
-const CHAINS: [(&str, usize, bool); 5] = [
-    ("links.axm", 2, true),
+const CHAINS: [(&str, usize, bool); 3] = [
     ("slow-repair.axm", 2, true),
     ("flip.axm", 2, true),
     ("server.axm", 3, true),
-    ("links-param.axm", 2, false),
 ];
 
 #[test]
@@ -31,17 +31,6 @@ fn chain_templates_parse_as_described() -> Result<(), TestError> {
         if chain.states.len() != states || chain.matrix.is_some() != exact {
             return Err(TestError::Field("chain template has the wrong form"));
         }
-    }
-    Ok(())
-}
-
-#[test]
-fn retry_template_parses_with_an_exact_success() -> Result<(), TestError> {
-    let CheckedModel::Retry(retry) = axiom_model::parse(&template("retry.axm")?)? else {
-        return Err(TestError::Field("expected a retry"));
-    };
-    if retry.probability.is_none() {
-        return Err(TestError::Field("retry template has parameters"));
     }
     Ok(())
 }
