@@ -1,7 +1,6 @@
 //! The command line, parsed by clap. Each command's arguments are typed
-//! here. A parse error is a usage error, exit code
-//! [`Outcome::Usage`](crate::outcome::Outcome::Usage), and its message never
-//! repeats what was typed.
+//! here. A parse error is a usage error, exit code [`Outcome::Usage`], and
+//! its message never repeats what was typed.
 
 use std::path::PathBuf;
 use std::time::Duration;
