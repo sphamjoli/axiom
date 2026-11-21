@@ -1,6 +1,6 @@
 use num_bigint::BigInt;
 use num_rational::BigRational;
-use num_traits::{One, Zero};
+use num_traits::{One, Pow, Zero};
 use thiserror::Error;
 
 /// An exact probability: a rational number between zero and one inclusive,
@@ -68,6 +68,21 @@ impl Probability {
     #[must_use]
     pub fn complement(&self) -> Self {
         Self(BigRational::one() - &self.0)
+    }
+
+    /// The probability one, of the certain event.
+    #[must_use]
+    pub fn one() -> Self {
+        Self(BigRational::one())
+    }
+
+    /// The probability `p^exponent` that `exponent` independent events of
+    /// probability `p` all occur. The result has up to `exponent` times as
+    /// many digits as `p`, so callers taking `exponent` from untrusted input
+    /// must bound it.
+    #[must_use]
+    pub fn pow(&self, exponent: u64) -> Self {
+        Self(Pow::pow(&self.0, exponent))
     }
 
     /// The exact value, in lowest terms.
