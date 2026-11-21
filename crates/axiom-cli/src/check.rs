@@ -108,7 +108,7 @@ impl Report {
     }
 
     /// Whether the checker accepted, as proven, a claim of kind `kind`, such
-    /// as `FixedPoint`. The certainty is the one [`parse_output`] matched
+    /// as `FixedPoint`. The certainty is the one the output parser matched
     /// against the claim kind, never the checker's word alone.
     #[must_use]
     pub fn proven(&self, kind: &str) -> bool {
