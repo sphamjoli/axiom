@@ -26,6 +26,7 @@ def verdictLine (index : Nat) (claim : Claim) (accepted : Bool) : String :=
   | .contraction _ => s!"claim {index} Contraction: {verdict}"
   | .convergenceBound .. => s!"claim {index} ConvergenceBound: {verdict}"
   | .termination .. => s!"claim {index} Termination: {verdict}"
+  | .parametricContraction => s!"claim {index} ParametricContraction: {verdict}"
 
 /-- Decides every claim, printing one verdict line each, and returns the exit
 status: 0 if all are accepted, 1 otherwise. -/

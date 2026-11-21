@@ -223,7 +223,37 @@ def twoState (c : Certificate) : Option TwoState :=
 def retryModel (c : Certificate) : Option Retry :=
   match c.model with
   | .retry success => some ⟨Fraction.toRat success⟩
-  | .chain _ => none
+  | _ => none
+
+/-- The two intervals of a certificate whose model is parametric. -/
+def parametricModel (c : Certificate) : Option (Interval × Interval) :=
+  match c.model with
+  | .parametric a b => some (a, b)
+  | _ => none
+
+/-- `x` lies in the interval: above the lower end, strictly when it is open,
+and below the upper end, strictly when it is open. -/
+def Interval.Contains (i : Interval) (x : Rat) : Prop :=
+  (if i.loOpen then (Fraction.toRat i.lo) < x else (Fraction.toRat i.lo) ≤ x) ∧
+    (if i.hiOpen then x < (Fraction.toRat i.hi) else x ≤ (Fraction.toRat i.hi))
+
+/-- The decidable facts a `ParametricContraction` claim is checked against:
+both intervals lie in `[0, 1]`, the infimum of `a + b` over the box, the sum
+of the lower ends, is positive or is not reached because an end is open,
+and the supremum, the sum of the upper ends, is below two or is not reached
+because an end is open. Since `a + b` is affine, these endpoint facts
+decide `0 < a + b < 2` on the whole box. -/
+def ParametricCertified (a b : Interval) : Prop :=
+  0 ≤ (Fraction.toRat a.lo) ∧ (Fraction.toRat a.hi) ≤ 1 ∧ 0 ≤ (Fraction.toRat b.lo) ∧ (Fraction.toRat b.hi) ≤ 1 ∧
+    (0 < (Fraction.toRat a.lo) + (Fraction.toRat b.lo) ∨
+      (0 ≤ (Fraction.toRat a.lo) + (Fraction.toRat b.lo) ∧ (a.loOpen = true ∨ b.loOpen = true))) ∧
+    ((Fraction.toRat a.hi) + (Fraction.toRat b.hi) < 2 ∨
+      ((Fraction.toRat a.hi) + (Fraction.toRat b.hi) ≤ 2 ∧ (a.hiOpen = true ∨ b.hiOpen = true)))
+
+/-- The parametric facts are decidable by exact arithmetic. -/
+instance (a b : Interval) : Decidable (ParametricCertified a b) := by
+  unfold ParametricCertified
+  infer_instance
 
 /-- The rational value of an optional `failure_after` pair. -/
 def failureToRat (failure : Option (Nat × Fraction)) : Option (Nat × Rat) :=
@@ -243,7 +273,9 @@ probability distribution, so it is never accepted about a matrix that is not
 stochastic, and `fixedPoint` requires `a + b ≠ 0`, so the fixed point is
 unique: the stationary probability. For `convergenceBound` and `termination` these are the
 certified facts; `AxiomCheck.Theorems` proves that they imply the claims'
-full meaning, `ConvergenceBoundHolds` and `TerminationHolds`. -/
+full meaning, `ConvergenceBoundHolds` and `TerminationHolds`, and for
+`parametricContraction` that every chain in range has the unique steady state
+`a / (a + b)` and contracts. -/
 def ClaimHolds (c : Certificate) : Claim → Prop
   | .mass r => ∃ row, rowValues c r = some row ∧ MassHolds row
   | .fixedPoint v =>
@@ -256,6 +288,8 @@ def ClaimHolds (c : Certificate) : Claim → Prop
   | .termination probability expected failure =>
     ∃ m, retryModel c = some m ∧ TerminationCertified m (Fraction.toRat probability)
       (expected.map Fraction.toRat) (failureToRat failure)
+  | .parametricContraction =>
+    ∃ a b, parametricModel c = some (a, b) ∧ ParametricCertified a b
 
 /-- Every claim of the certificate holds. -/
 def CertificateHolds (c : Certificate) : Prop :=

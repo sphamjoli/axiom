@@ -20,7 +20,8 @@ definitions they are about.
   implies `|d_t - d*| ≤ ε` for every `t ≥ n`, and perturbations decay as
   `|λ| ^ t`.
 * Two-state parameters: for `0 < a + b < 2`, `d*` is the unique fixed point
-  and the update is a strict contraction.
+  and the update is a strict contraction; certified interval endpoints give
+  that for every `(a, b)` in a parametric model's range.
 * Retry termination: the closed-form success probability is the least fixed
   point, and the expected attempts and failure probabilities have their
   closed forms.
@@ -181,6 +182,46 @@ theorem TwoState.parametric (m : TwoState) (ha : 0 ≤ m.a ∧ m.a ≤ 1)
     (∀ v, FixedPointHolds m v ↔ v = m.fixedPoint) ∧ ContractionHolds m m.lam :=
   ⟨m.fixedPoint_unique ha hb hpos hlt, m.lam_contraction ha hb hpos hlt, rfl⟩
 
+/-- The bounds a value in an interval satisfies: it lies between the ends,
+strictly above an open lower end and strictly below an open upper end. -/
+theorem Interval.contains_bounds (i : Interval) (x : ℚ) (h : Interval.Contains i x) :
+    Fraction.toRat i.lo ≤ x ∧ x ≤ Fraction.toRat i.hi ∧
+      (i.loOpen = true → Fraction.toRat i.lo < x) ∧
+      (i.hiOpen = true → x < Fraction.toRat i.hi) := by
+  unfold Interval.Contains at h
+  obtain ⟨hlo, hhi⟩ := h
+  cases hl : i.loOpen <;> cases hh : i.hiOpen <;> simp only [hl, hh, if_true, if_false,
+    Bool.false_eq_true] at hlo hhi <;>
+    exact ⟨by linarith, by linarith, by simp [hlo], by simp [hhi]⟩
+
+/-- The certified endpoint facts put every `(a, b)` in range inside the
+hypotheses of `TwoState.parametric`: `a, b ∈ [0, 1]` and `0 < a + b < 2`. -/
+theorem parametric_in_range (ia ib : Interval) (h : ParametricCertified ia ib) (a b : ℚ)
+    (ha : Interval.Contains ia a) (hb : Interval.Contains ib b) :
+    (0 ≤ a ∧ a ≤ 1) ∧ (0 ≤ b ∧ b ≤ 1) ∧ 0 < a + b ∧ a + b < 2 := by
+  obtain ⟨hal, hah, halo, hahi⟩ := Interval.contains_bounds ia a ha
+  obtain ⟨hbl, hbh, hblo, hbhi⟩ := Interval.contains_bounds ib b hb
+  obtain ⟨h0a, h1a, h0b, h1b, hinf, hsup⟩ := h
+  refine ⟨⟨by linarith, by linarith⟩, ⟨by linarith, by linarith⟩, ?_, ?_⟩
+  · rcases hinf with hpos | ⟨_, hopen | hopen⟩
+    · linarith
+    · linarith [halo hopen]
+    · linarith [hblo hopen]
+  · rcases hsup with hlt | ⟨_, hopen | hopen⟩
+    · linarith
+    · linarith [hahi hopen]
+    · linarith [hbhi hopen]
+
+/-- The full meaning of a `ParametricContraction` claim: for every `a` and
+`b` in range, `a / (a + b)` is the unique fixed point of the chain's update
+and the update contracts with factor `1 - a - b`. -/
+theorem parametric_holds (ia ib : Interval) (h : ParametricCertified ia ib) (a b : ℚ)
+    (ha : Interval.Contains ia a) (hb : Interval.Contains ib b) :
+    (∀ v, FixedPointHolds ⟨a, b⟩ v ↔ v = a / (a + b)) ∧
+      ContractionHolds ⟨a, b⟩ (1 - a - b) := by
+  obtain ⟨hra, hrb, hpos, hlt⟩ := parametric_in_range ia ib h a b ha hb
+  exact TwoState.parametric ⟨a, b⟩ hra hrb hpos hlt
+
 /-! ## Retry termination -/
 
 /-- When `0 < p ≤ 1`, success is certain: one is the least fixed point. -/
@@ -239,9 +280,15 @@ theorem Retry.failureAfter_eq (m : Retry) (k : ℕ) :
 step `steps` on is within `tolerance` of the stationary probability; for
 `termination`, `probability` is the least fixed point of the retry equation,
 the expected attempts solve `E = 1 + (1 - p) E` with `p > 0`, and the failure
-probability is that of the first `k` attempts all failing. The other kinds
-mean what `ClaimHolds` says. -/
+probability is that of the first `k` attempts all failing; for
+`parametricContraction`, every chain in range has the unique steady state
+`a / (a + b)` and contracts. The other kinds mean what `ClaimHolds` says. -/
 def ClaimMeans (c : Certificate) : Claim → Prop
+  | .parametricContraction =>
+    ∃ ia ib, parametricModel c = some (ia, ib) ∧
+      ∀ a b, Interval.Contains ia a → Interval.Contains ib b →
+        (∀ v, FixedPointHolds ⟨a, b⟩ v ↔ v = a / (a + b)) ∧
+          ContractionHolds ⟨a, b⟩ (1 - a - b)
   | .convergenceBound start steps tolerance =>
     ∃ m, twoState c = some m ∧
       ConvergenceBoundHolds m (Fraction.toRat start) steps (Fraction.toRat tolerance)
@@ -276,6 +323,9 @@ theorem claimHolds_means (c : Certificate) (claim : Claim) (h : ClaimHolds c cla
       have hsome : failureToRat failure = some (k, Fraction.toRat q) := by
         rw [hf]; rfl
       rw [hfail k _ hsome, m.failureAfter_eq]
+  | parametricContraction =>
+    obtain ⟨ia, ib, hm, hcert⟩ := h
+    exact ⟨ia, ib, hm, parametric_holds ia ib hcert⟩
 
 /-- Full soundness: if the checker accepts a certificate, every claim holds in
 its full meaning. -/

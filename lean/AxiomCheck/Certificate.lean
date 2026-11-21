@@ -1,7 +1,7 @@
 /-!
 # Certificates
 
-The checker's view of a version 1, 2 or 3 certificate. Values of these types are produced only
+The checker's view of a version 1, 2, 3 or 4 certificate. Values of these types are produced only
 by `AxiomCheck.Parse.certificate`, which enforces every rule of the format
 except the arithmetic ones that the checker itself verifies.
 -/
@@ -53,6 +53,23 @@ inductive Claim where
   version 3. -/
   | termination (probability : Fraction) (expectedAttempts : Option Fraction)
       (failureAfter : Option (Nat × Fraction))
+  /-- The model is parametric and, for every `a` and `b` in range,
+  `0 < a + b < 2`, so each chain has the unique steady state `a / (a + b)`
+  and contracts with factor `|1 - a - b| < 1`. Introduced in version 4. -/
+  | parametricContraction
+  deriving DecidableEq, Repr
+
+/-- A non-empty interval of probabilities from `lo` to `hi`, each end open
+(excluded) or closed (included), as in `]0, 1[`. -/
+structure Interval where
+  /-- The lower end. -/
+  lo : Fraction
+  /-- The upper end. -/
+  hi : Fraction
+  /-- Whether the lower end is excluded. -/
+  loOpen : Bool
+  /-- Whether the upper end is excluded. -/
+  hiOpen : Bool
   deriving DecidableEq, Repr
 
 /-- The model a certificate embeds. -/
@@ -62,6 +79,9 @@ inductive Model where
   /-- A retry loop whose attempts each succeed with probability `success`.
   Introduced in version 3. -/
   | retry (success : Fraction)
+  /-- The two-state chain `[[1 - a, a], [b, 1 - b]]` for every `a` in `a`
+  and `b` in `b`. Introduced in version 4. -/
+  | parametric (a b : Interval)
   deriving DecidableEq, Repr
 
 /-- A certificate whose structure is valid: a model that is either a square
@@ -69,7 +89,8 @@ matrix of 1 to 16 rows of canonical fractions no greater than one or a retry
 loop, and a non-empty list of distinct claims that refer to the right kind of
 model: `mass` claims to existing rows of a chain, `fixedPoint`,
 `contraction` and `convergenceBound` claims to a two-state chain, and
-`termination` claims to a retry loop. -/
+`termination` claims to a retry loop, and `parametricContraction` claims to
+a parametric model of two non-empty intervals. -/
 structure Certificate where
   /-- The embedded model. -/
   model : Model
@@ -77,11 +98,12 @@ structure Certificate where
   claims : List Claim
   deriving Repr
 
-/-- The transition matrix of a chain certificate, or no rows for a retry
-model. -/
+/-- The transition matrix of a chain certificate, or no rows for a retry or
+parametric model. -/
 def Certificate.rows (c : Certificate) : List (List Fraction) :=
   match c.model with
   | .chain rows => rows
   | .retry _ => []
+  | .parametric _ _ => []
 
 end AxiomCheck

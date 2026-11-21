@@ -5,13 +5,17 @@ import AxiomCheck.Json
 # Reading certificates
 
 Turns certificate text into a `Certificate`, enforcing the structural rules of
-the version 1, 2 and 3 formats: size, JSON syntax and fields, `format`,
+the version 1, 2, 3 and 4 formats: size, JSON syntax and fields, `format`,
 `version`, model, fractions, then claims. Version 2 adds the `FixedPoint` and
 `Contraction` claim kinds, which are only allowed in a certificate whose model
 has exactly two states. Version 3 adds the `ConvergenceBound` claim kind for
 two-state chains, the retry model `{"retry": {"success": p}}` as an
 alternative to `{"rows": ...}`, and the `Termination` claim kind for retry
-models; step and attempt counts are capped at `maxCount`.
+models; step and attempt counts are capped at `maxCount`. Version 4 adds the
+parametric model `{"parametric": {"a": interval, "b": interval}}`, where an
+interval is `{"lo": f, "hi": f, "lo_end": e, "hi_end": e}` with probability
+ends and each `e` the string `open` or `closed` (the JSON reader has no
+booleans), and the `ParametricContraction` claim kind for it.
 
 The reader leaves the arithmetic of claims to the claim check: the sum of each
 row, and whether a fixed point, contraction factor, convergence bound or
@@ -153,7 +157,7 @@ states. -/
 def requireTwoState (needed version : Nat) (model : Model) : Except String Unit :=
   if version < needed then .error s!"claim kind needs certificate version {needed}"
   else match model with
-    | .retry _ => .error "claim kind needs a chain model"
+    | .retry _ | .parametric _ _ => .error "claim kind needs a chain model"
     | .chain rows => if rows.length != 2 then .error "claim kind needs a two-state model" else pure ()
 
 /-- The `failure_after` object of a `Termination` claim. -/
@@ -197,11 +201,36 @@ def claim (version : Nat) (model : Model) (value : Value) : Except String Claim 
     let expected ← (members.lookup "expected_attempts").mapM unboundedFraction
     let failure ← (members.lookup "failure_after").mapM failureAfter
     pure (.termination probability expected failure)
+  | "ParametricContraction" =>
+    if version < 4 then .error "claim kind needs certificate version 4"
+    let .parametric _ _ := model | .error "claim kind needs a parametric model"
+    let _ ← exactMembers ["kind"] value
+    pure .parametricContraction
   | _ => .error "unknown claim kind"
 
+/-- An interval end: `open` excludes the end value, `closed` includes it. -/
+def intervalEnd : Value → Except String Bool
+  | .str "open" => .ok true
+  | .str "closed" => .ok false
+  | _ => .error "interval end must be open or closed"
+
+/-- An interval of a parametric model: two probability ends, each open or
+closed, containing at least one value. -/
+def interval (value : Value) : Except String Interval := do
+  let members ← exactMembers ["lo", "hi", "lo_end", "hi_end"] value
+  let lo ← fraction (← field members "lo")
+  let hi ← fraction (← field members "hi")
+  let loOpen ← intervalEnd (← field members "lo_end")
+  let hiOpen ← intervalEnd (← field members "hi_end")
+  let below := lo.num * hi.den < hi.num * lo.den
+  let equal := lo.num * hi.den == hi.num * lo.den
+  if below || (equal && !loOpen && !hiOpen) then pure ⟨lo, hi, loOpen, hiOpen⟩
+  else .error "interval is empty"
+
 /-- The model of a certificate of version `version`: an object with exactly
-one of `rows`, a transition matrix, and `retry`, a retry loop that needs
-version 3. -/
+one of `rows`, a transition matrix, `retry`, a retry loop that needs
+version 3, and `parametric`, a parametric two-state chain that needs
+version 4. -/
 def model (version : Nat) (value : Value) : Except String Model := do
   match value with
   | .obj [("rows", rows)] => pure (.chain (← matrix rows))
@@ -209,7 +238,11 @@ def model (version : Nat) (value : Value) : Except String Model := do
     if version < 3 then .error "retry model needs certificate version 3"
     let members ← exactMembers ["success"] retry
     pure (.retry (← fraction (← field members "success")))
-  | .obj _ => .error "model must have exactly one of rows and retry"
+  | .obj [("parametric", parametric)] =>
+    if version < 4 then .error "parametric model needs certificate version 4"
+    let members ← exactMembers ["a", "b"] parametric
+    pure (.parametric (← interval (← field members "a")) (← interval (← field members "b")))
+  | .obj _ => .error "model must have exactly one of rows, retry and parametric"
   | _ => .error "expected an object"
 
 /-- The claims: non-empty and distinct. -/
@@ -220,7 +253,7 @@ def claims (version : Nat) (model : Model) (value : Value) :
   else if parsed.eraseDups.length != parsed.length then .error "a claim is repeated"
   else pure parsed
 
-/-- Reads and structurally validates a version 1, 2 or 3 certificate. -/
+/-- Reads and structurally validates a version 1, 2, 3 or 4 certificate. -/
 def certificate (text : String) : Except String Certificate := do
   if text.utf8ByteSize > maxCertificateBytes then .error "certificate is too large"
   let root ← match Json.parse text with
@@ -230,7 +263,7 @@ def certificate (text : String) : Except String Certificate := do
   let (.str format) ← field members "format" | .error "format must be a string"
   if format != "axiom-certificate" then .error "certificate format is not axiom-certificate"
   let (.nat version) ← field members "version" | .error "version must be an integer"
-  if version < 1 || version > 3 then .error s!"unsupported certificate version"
+  if version < 1 || version > 4 then .error s!"unsupported certificate version"
   let parsedModel ← model version (← field members "model")
   let claimList ← claims version parsedModel (← field members "claims")
   pure ⟨parsedModel, claimList⟩

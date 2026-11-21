@@ -99,6 +99,16 @@ theorem checkTermination_sound (m : Retry) (probability : Rat) (expected : Optio
     subst hsome
     exact of_decide_eq_true hf
 
+/-- Whether a `ParametricContraction` claim's endpoint facts hold for the
+intervals `a` and `b`. -/
+def checkParametric (a b : Interval) : Bool :=
+  decide (ParametricCertified a b)
+
+/-- A successful parametric check implies `ParametricCertified`. -/
+theorem checkParametric_sound (a b : Interval) (h : checkParametric a b = true) :
+    ParametricCertified a b :=
+  of_decide_eq_true h
+
 /-- Checks one claim of a certificate against its embedded model. A
 `fixedPoint` or `contraction` claim fails unless the model has two states. -/
 def checkClaim (c : Certificate) : Claim → Bool
@@ -124,6 +134,10 @@ def checkClaim (c : Certificate) : Claim → Bool
     match retryModel c with
     | some m => checkTermination m (Fraction.toRat probability) (expected.map Fraction.toRat)
         (failureToRat failure)
+    | none => false
+  | .parametricContraction =>
+    match parametricModel c with
+    | some (a, b) => checkParametric a b
     | none => false
 
 /-- Checks every claim of a certificate. -/
@@ -184,6 +198,16 @@ theorem checkClaim_sound (c : Certificate) (claim : Claim) (h : checkClaim c cla
     | some m =>
       rw [hm] at h
       exact ⟨m, rfl, checkTermination_sound m _ _ _ h⟩
+    | none =>
+      rw [hm] at h
+      exact absurd h Bool.false_ne_true
+  | parametricContraction =>
+    simp only [checkClaim] at h
+    simp only [ClaimHolds]
+    cases hm : parametricModel c with
+    | some ab =>
+      rw [hm] at h
+      exact ⟨ab.1, ab.2, rfl, checkParametric_sound ab.1 ab.2 h⟩
     | none =>
       rw [hm] at h
       exact absurd h Bool.false_ne_true
