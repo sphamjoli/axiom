@@ -1,4 +1,4 @@
-import { SIM_CAPS } from "./engine/types";
+import { SIM_CAPS, type Fraction, type Point } from "./engine/types";
 
 // A run as a URL fragment, so a link replays the identical run and nothing
 // is sent to a server. The fragment is untrusted input: it is size-limited,
@@ -11,6 +11,8 @@ export interface SharedRun {
   samples: number;
   steps: number;
   maxAttempts: number;
+  // The point of a parametric chain's box that was simulated, if any.
+  point?: Point;
 }
 
 const PREFIX = "#run=";
@@ -40,6 +42,21 @@ export const inRange = (value: unknown, max: number): value is number => Number.
 // Whether `text` is a decimal seed that fits in 64 bits.
 export const isSeed = (text: string): boolean => /^\d{1,20}$/.test(text) && BigInt(text) <= 18446744073709551615n;
 
+// A fraction of decimal integers of at most 9 digits with a non-zero
+// denominator, the most the engine reads; whether it lies in the box is
+// left to the engine.
+function isFraction(value: unknown): value is Fraction {
+  if (typeof value !== "object" || value === null) return false;
+  const { num, den } = value as Record<string, unknown>;
+  return typeof num === "string" && typeof den === "string" && /^\d{1,9}$/.test(num) && /^\d{1,9}$/.test(den) && !/^0+$/.test(den);
+}
+
+function parsePoint(value: unknown): Point | null {
+  if (typeof value !== "object" || value === null) return null;
+  const { a, b } = value as Record<string, unknown>;
+  return isFraction(a) && isFraction(b) ? { a: { num: a.num, den: a.den }, b: { num: b.num, den: b.den } } : null;
+}
+
 function parse(data: unknown): SharedRun | null {
   if (typeof data !== "object" || data === null) return null;
   const run = data as Record<string, unknown>;
@@ -47,7 +64,9 @@ function parse(data: unknown): SharedRun | null {
   if (typeof model !== "string" || new TextEncoder().encode(model).length > MAX_MODEL_BYTES) return null;
   if (typeof seed !== "string" || !isSeed(seed)) return null;
   if (!inRange(samples, SIM_CAPS.samples) || !inRange(steps, SIM_CAPS.steps) || !inRange(maxAttempts, SIM_CAPS.attempts)) return null;
-  return { model, seed, samples, steps, maxAttempts };
+  if (run.point === undefined) return { model, seed, samples, steps, maxAttempts };
+  const point = parsePoint(run.point);
+  return point ? { model, seed, samples, steps, maxAttempts, point } : null;
 }
 
 export function encodeRun(run: SharedRun): string | null {

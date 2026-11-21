@@ -5,10 +5,11 @@ import ConvergencePlot from "./components/ConvergencePlot.vue";
 import Frac from "./components/Frac.vue";
 import ModelControls from "./components/ModelControls.vue";
 import ModelEditor from "./components/ModelEditor.vue";
+import ParametricPanel from "./components/ParametricPanel.vue";
 import SimulatePanel from "./components/SimulatePanel.vue";
 import TransitionGraph from "./components/TransitionGraph.vue";
-import type { Analysis, Diagnostic, Engine, Fraction } from "./engine/types";
-import { complement } from "./format";
+import type { AnalyzeAtResult, Analysis, Diagnostic, Engine, Fraction, Point } from "./engine/types";
+import { complement, fractionText } from "./format";
 import ModelGuide from "./components/ModelGuide.vue";
 import { TEMPLATES } from "./models/templates";
 import { modelClock as clock } from "./playback";
@@ -22,6 +23,10 @@ const engine: Engine = wasmEngine;
 const sharedRun = decodeRun(window.location.hash);
 const source = ref(sharedRun?.model ?? TEMPLATES[0]?.source ?? "");
 const analysis = shallowRef<Analysis | null>(null);
+// The point of a parametric chain's box the page shows, or null to let the
+// engine pick the midpoint. A shared link may bring one; the engine checks
+// it lies in the box before using it.
+const chosen = shallowRef<Point | null>(sharedRun?.point ?? null);
 const diagnostics = ref<Diagnostic[]>([]);
 // True while the editor holds a model with errors: the results on the page
 // are then from the last valid model, so they are dimmed and cannot be used.
@@ -37,16 +42,22 @@ let latestRun = 0;
 async function runAnalysis(text: string): Promise<void> {
   latestRun += 1;
   const run = latestRun;
-  const result = await engine.analyze(text);
+  const at = chosen.value;
+  let result: AnalyzeAtResult = at ? await engine.analyzeAt(text, at) : await engine.analyze(text);
+  // A point that does not fit the model, or a model without a box, falls
+  // back to the plain analysis, which shows the midpoint.
+  if (!result.ok && "error" in result) result = await engine.analyze(text);
   if (run !== latestRun) return;
   if (result.ok) {
     analysis.value = result.analysis;
+    const point = result.analysis.parametric?.point;
+    chosen.value = point ? { a: point.a, b: point.b } : null;
     // Every new model plays its convergence once from t = 0, then waits.
     const series = result.analysis.convergence?.series;
     if (series) clock.restart(series.length - 1);
     diagnostics.value = [];
     stale.value = false;
-  } else {
+  } else if ("diagnostics" in result) {
     diagnostics.value = result.diagnostics;
     stale.value = analysis.value !== null;
   }
@@ -57,6 +68,20 @@ watch(source, (text) => {
   pending = setTimeout(() => void runAnalysis(text), ANALYSIS_DELAY_MS);
 });
 onBeforeUnmount(() => clearTimeout(pending));
+
+// Picking a point re-analyses that instance at once; the text is unchanged.
+function pick(point: Point): void {
+  chosen.value = point;
+  clearTimeout(pending);
+  void runAnalysis(source.value);
+}
+
+const instanceLabel = computed(() => {
+  const parametric = analysis.value?.parametric;
+  if (!parametric) return null;
+  const { a, b, point } = parametric;
+  return `Showing ${a.name} = ${fractionText(point.a)}, ${b.name} = ${fractionText(point.b)}`;
+});
 void runAnalysis(source.value);
 
 // The probability of each state at the clock's step: the series tracks the
@@ -131,7 +156,11 @@ watchEffect(() => document.documentElement.classList.toggle("dark", dark.value))
       <p v-if="stale" class="panel text-sm text-rejected lg:col-span-2" role="status">
         The model has an error, so the results below are from the last valid model and cannot be used. Fix the error to update them.
       </p>
-      <ModelControls :class="{ 'is-stale': stale }" :inert="stale" :analysis="analysis" @source="load" />
+      <ParametricPanel v-if="analysis?.parametric" :class="{ 'is-stale': stale }" :inert="stale" :parametric="analysis.parametric" @show="reveal('instance')" />
+      <ModelControls :class="{ 'is-stale': stale }" :inert="stale" :analysis="analysis" @source="load" @point="pick" />
+      <p v-if="instanceLabel" id="instance" class="panel py-3 font-mono text-sm text-ink lg:col-span-2" :class="{ 'is-stale': stale }" role="status">
+        {{ instanceLabel }}<span class="font-sans text-ink-muted">: the graph, the convergence plot and the simulation below are this instance.</span>
+      </p>
       <TransitionGraph :class="{ 'is-stale': stale }" :inert="stale" v-if="analysis?.chain" :chain="analysis.chain" :mass="mass" :step="clock.t.value" />
       <section v-if="analysis?.notice" class="panel" :class="{ 'is-stale': stale }" :inert="stale">
         <h2 class="panel-title">Model {{ analysis.name }}</h2>

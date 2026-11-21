@@ -91,9 +91,9 @@ export const TEMPLATES: Template[] = [
       { plain: "a is any failure chance strictly between 0 and 1.", line: "param a in ]0, 1[" },
       { plain: "An up link stays up with chance 1 - a.", line: "from up:   up 1 - a, down a" },
     ],
-    note: "The browser checks this model but does not analyse parameters yet.",
+    note: "One claim covers every a and b in the range. Pick a point to see that instance in the graph, the convergence plot and the simulation; the text keeps a and b symbolic.",
     source: linksParam,
-    preset: null,
+    preset: "Links with parameters: every a and b",
   },
   {
     id: "broken",

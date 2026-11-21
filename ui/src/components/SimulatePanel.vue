@@ -33,6 +33,15 @@ const REPLAY_FRAMES = 20;
 const replay = createClock();
 const reveal = computed(() => (replay.last.value === 0 ? 1 : replay.t.value / replay.last.value));
 
+// A parametric chain is simulated at the chosen point: the engine's model
+// text of that instance, with the values in place of the parameters.
+const parametric = computed(() => props.analysis.parametric);
+const runSource = computed(() => parametric.value?.point.source ?? props.source);
+const pointText = computed(() => {
+  const p = parametric.value;
+  return p ? `${p.a.name} = ${fractionText(p.point.a)}, ${p.b.name} = ${fractionText(p.point.b)}` : null;
+});
+
 const kind = computed(() => (props.analysis.chain ? "chain" : "retry"));
 const seedValid = computed(() => isSeed(seed.value));
 const samplesValid = computed(() => inRange(samples.value, SIM_CAPS.samples));
@@ -48,7 +57,8 @@ const explanation = computed(() => {
   const chain = props.analysis.chain;
   if (chain) {
     const [first, second] = [chain.states[0] ?? "", chain.states[1] ?? chain.states[0] ?? ""];
-    return `Simulates ${runs("copy", "copies")} of ${chain.name} from ${first} for ${counted(steps.value, "step")}, rolling the chances in your model at each step, then counts how many end ${second}.`;
+    const at = pointText.value ? ` at ${pointText.value}` : "";
+    return `Simulates ${runs("copy", "copies")} of ${chain.name}${at} from ${first} for ${counted(steps.value, "step")}, rolling the chances in your model at each step, then counts how many end ${second}.`;
   }
   const success = props.analysis.retry ? fractionText(props.analysis.retry.success) : "";
   return `Simulates ${runs("request")}, each tried up to ${counted(maxAttempts.value, "time")} with a ${success} chance of success per attempt, then counts the attempts each needed.`;
@@ -79,9 +89,10 @@ function newSeed(): void {
   seedChanged.value = result.value !== null;
 }
 
-// A run is for one version of the model; editing the model clears it.
+// A run is for one version of the model and one point; changing either
+// clears it.
 watch(
-  () => props.source,
+  runSource,
   () => {
     result.value = null;
     failure.value = null;
@@ -92,7 +103,7 @@ watch(
 async function simulate(request: SimulateRequest): Promise<void> {
   running.value = true;
   copied.value = null;
-  const outcome = await props.engine.simulate(props.source, request);
+  const outcome = await props.engine.simulate(runSource.value, request);
   running.value = false;
   if (outcome.ok) {
     result.value = outcome.simulation;
@@ -100,7 +111,8 @@ async function simulate(request: SimulateRequest): Promise<void> {
     lastRequest.value = request;
     seedChanged.value = false;
     replay.restart(REPLAY_FRAMES);
-    const fragment = encodeRun({ model: props.source, ...request });
+    const p = parametric.value;
+    const fragment = encodeRun({ model: props.source, ...request, ...(p ? { point: { a: p.point.a, b: p.point.b } } : {}) });
     if (fragment) history.replaceState(null, "", fragment);
   } else {
     result.value = null;
@@ -187,7 +199,7 @@ onMounted(() => {
 
     <div v-if="result" class="sim-result mt-5 grid gap-5">
       <div class="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-rule pb-2 text-sm text-ink-muted">
-        <span>{{ counted(result.samples, "run") }} of {{ result.name }}, seed</span>
+        <span>{{ counted(result.samples, "run") }} of {{ result.name }}<template v-if="pointText"> at {{ pointText }}</template>, seed</span>
         <code class="select-all font-mono text-ink">{{ result.seed }}</code>
         <button class="btn py-0.5 text-xs" type="button" @click="copy('seed', result.seed)">{{ copied === "seed" ? "Seed copied" : "Copy seed" }}</button>
         <button class="btn py-0.5 text-xs" type="button" @click="copyLink">{{ copied === "link" ? "Link copied" : "Copy link to this run" }}</button>
