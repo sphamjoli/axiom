@@ -16,5 +16,5 @@ rev = "v4.19.0"
 
 [[lean_lib]]
 name = "AxiomCheck"
-roots = ["AxiomCheck", "AxiomCheck.Theorems"]
+roots = ["AxiomCheck", "AxiomCheck.Estimate", "AxiomCheck.Theorems", "AxiomCheck.Theorems.Estimate"]
 moreLeanArgs = ["-DwarningAsError=true"]
