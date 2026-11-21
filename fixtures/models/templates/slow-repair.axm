@@ -1,0 +1,7 @@
+# Slow repair: a link that is up fails 1 time in 10, and a link that is
+# down is repaired only 1 time in 10.
+chain links {
+  states up, down
+  from up:   up 9/10, down 1/10
+  from down: up 1/10, down 9/10
+}

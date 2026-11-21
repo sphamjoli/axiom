@@ -1,0 +1,8 @@
+# A server that is up, degraded or down. A state left out of a row has
+# chance 0: an up server never goes straight down.
+chain server {
+  states up, degraded, down
+  from up:       up 9/10, degraded 1/10
+  from degraded: up 1/2, degraded 3/10, down 1/5
+  from down:     up 1/4, down 3/4
+}

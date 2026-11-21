@@ -1,0 +1,7 @@
+# Alice's links: a link that is up fails with probability 1/10, and a link
+# that is down is repaired with probability 3/10.
+chain links {
+  states up, down
+  from up:   up 9/10, down 1/10
+  from down: up 3/10, down 7/10
+}
