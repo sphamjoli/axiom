@@ -282,7 +282,9 @@ step `steps` on is within `tolerance` of the stationary probability; for
 the expected attempts solve `E = 1 + (1 - p) E` with `p > 0`, and the failure
 probability is that of the first `k` attempts all failing; for
 `parametricContraction`, every chain in range has the unique steady state
-`a / (a + b)` and contracts. The other kinds mean what `ClaimHolds` says. -/
+`a / (a + b)` and contracts. The other kinds mean what `ClaimHolds` says;
+for `estimate`, `AxiomCheck.Theorems.Estimate` proves the real Hoeffding
+bound. -/
 def ClaimMeans (c : Certificate) : Claim → Prop
   | .parametricContraction =>
     ∃ ia ib, parametricModel c = some (ia, ib) ∧
@@ -326,6 +328,7 @@ theorem claimHolds_means (c : Certificate) (claim : Claim) (h : ClaimHolds c cla
   | parametricContraction =>
     obtain ⟨ia, ib, hm, hcert⟩ := h
     exact ⟨ia, ib, hm, parametric_holds ia ib hcert⟩
+  | estimate => exact h
 
 /-- Full soundness: if the checker accepts a certificate, every claim holds in
 its full meaning. -/

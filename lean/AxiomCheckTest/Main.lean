@@ -236,6 +236,35 @@ def versionThreeCases : IO (List Outcome) := do
           [.convergenceBound ⟨1, 1⟩ 1000 ⟨1, 10 ^ 60⟩]⟩)
         "accepted a bound the slow chain does not reach" ]
 
+/-- Cases for the version 4 golden files: the parametric links model with
+`a` and `b` in `]0, 1[`, and the links model with its steady-state estimate,
+whose verdict line says it is estimated, not proven. -/
+def versionFourCases : IO (List Outcome) := do
+  let param ← IO.FS.readFile (fixtureDirectory / "links-param.json")
+  let estimate ← IO.FS.readFile (fixtureDirectory / "links-estimate.json")
+  let openUnit : Interval := ⟨⟨0, 1⟩, ⟨1, 1⟩, true, true⟩
+  pure
+    [ expect "reads and checks the parametric golden file"
+        (match Parse.certificate param with
+         | .ok c => c.model == .parametric openUnit openUnit &&
+           c.claims == [.parametricContraction] && Check.check c
+         | .error _ => false)
+        "parametric golden file did not check"
+    , expect "reads and checks the estimate golden file"
+        (match Parse.certificate estimate with
+         | .ok c => c.claims.getLast? ==
+             some (.estimate .steadyState ⟨9583, 38005⟩ 38005 ⟨1, 100⟩ ⟨1, 1000⟩ 42) &&
+           Check.check c
+         | .error _ => false)
+        "estimate golden file did not check"
+    , expect "labels an accepted estimate as estimated and other claims as proven"
+        (Verdict.verdictLine 5 (.estimate .success ⟨1, 2⟩ 1 ⟨1, 2⟩ ⟨1, 2⟩ 0) true ==
+            "claim 5 Estimate: accepted (estimated)" &&
+          Verdict.verdictLine 0 (.mass 0) true == "claim 0 Mass row 0: accepted (proven)" &&
+          Verdict.verdictLine 1 .parametricContraction false ==
+            "claim 1 ParametricContraction: rejected")
+        "verdict lines are mislabelled" ]
+
 /-- Cases for size and shape limits that are impractical as fixture files. -/
 def limitCases : List Outcome :=
   let half := "{\"num\":\"1\",\"den\":\"2\"}"
@@ -272,7 +301,7 @@ open AxiomCheckTest in
 /-- Runs every case, prints failures, and returns 1 if any failed. -/
 def main : IO UInt32 := do
   let outcomes :=
-    readerCases ++ (← goldenCases) ++ (← checkCases) ++ (← twoStateCases) ++ (← versionThreeCases) ++ (← acceptanceCases) ++ (← rejectionCases) ++ semanticsCases ++ limitCases
+    readerCases ++ (← goldenCases) ++ (← checkCases) ++ (← twoStateCases) ++ (← versionThreeCases) ++ (← versionFourCases) ++ (← acceptanceCases) ++ (← rejectionCases) ++ semanticsCases ++ limitCases
   let failures := outcomes.filterMap fun outcome => outcome.failure.map (outcome.name, ·)
   for (name, why) in failures do
     IO.eprintln s!"FAIL {name}: {why}"

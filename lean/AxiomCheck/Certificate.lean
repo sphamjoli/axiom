@@ -31,6 +31,18 @@ structure SignedFraction where
   den : Nat
   deriving DecidableEq, Repr
 
+/-- The quantity an `Estimate` claim estimates: for a two-state chain, the
+probability of being in the second state after a fixed number of steps
+from the first, which approximates the steady state; for a retry loop, the
+probability of success within a fixed number of attempts. Each sample is
+`0` or `1`, as Hoeffding's inequality requires. -/
+inductive Quantity where
+  /-- `steady-state`, about a two-state chain. -/
+  | steadyState
+  /-- `success`, about a retry loop. -/
+  | success
+  deriving DecidableEq, Repr
+
 /-- A claim about the embedded model. -/
 inductive Claim where
   /-- Every entry of row `row` is a probability and the entries sum to
@@ -57,6 +69,13 @@ inductive Claim where
   `0 < a + b < 2`, so each chain has the unique steady state `a / (a + b)`
   and contracts with factor `|1 - a - b| < 1`. Introduced in version 4. -/
   | parametricContraction
+  /-- An estimate of `quantity` from `samples` samples drawn with `seed`:
+  the stated count satisfies Hoeffding's bound for tolerance `epsilon` and
+  failure probability `delta`. It asserts nothing about whether `value` is
+  correct; its certainty is estimated, never proven. Introduced in
+  version 4. -/
+  | estimate (quantity : Quantity) (value : Fraction) (samples : Nat) (epsilon delta : Fraction)
+      (seed : Nat)
   deriving DecidableEq, Repr
 
 /-- A non-empty interval of probabilities from `lo` to `hi`, each end open

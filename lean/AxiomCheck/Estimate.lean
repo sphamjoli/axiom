@@ -1,4 +1,4 @@
-import AxiomCheck.Semantics
+import AxiomCheck.Rational
 
 /-!
 # Estimate

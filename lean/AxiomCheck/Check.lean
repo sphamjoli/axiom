@@ -1,4 +1,5 @@
 import AxiomCheck.Semantics
+import AxiomCheck.Estimate
 
 /-!
 # Claim checks
@@ -109,6 +110,13 @@ theorem checkParametric_sound (a b : Interval) (h : checkParametric a b = true) 
     ParametricCertified a b :=
   of_decide_eq_true h
 
+/-- A successful Hoeffding check implies `EstimateCertified`: the sample
+count meets the bound. Nothing is checked or implied about the value. -/
+theorem checkHoeffding_certified (n : Nat) (ε δ : Rat)
+    (h : Estimate.checkHoeffding n ε δ = true) : EstimateCertified n ε δ := by
+  simp only [Estimate.checkHoeffding, Bool.and_eq_true, decide_eq_true_eq] at h
+  exact h
+
 /-- Checks one claim of a certificate against its embedded model. A
 `fixedPoint` or `contraction` claim fails unless the model has two states. -/
 def checkClaim (c : Certificate) : Claim → Bool
@@ -139,6 +147,8 @@ def checkClaim (c : Certificate) : Claim → Bool
     match parametricModel c with
     | some (a, b) => checkParametric a b
     | none => false
+  | .estimate _ _ samples epsilon delta _ =>
+    Estimate.checkHoeffding samples (Fraction.toRat epsilon) (Fraction.toRat delta)
 
 /-- Checks every claim of a certificate. -/
 def check (c : Certificate) : Bool :=
@@ -211,6 +221,8 @@ theorem checkClaim_sound (c : Certificate) (claim : Claim) (h : checkClaim c cla
     | none =>
       rw [hm] at h
       exact absurd h Bool.false_ne_true
+  | estimate _ _ samples epsilon delta _ =>
+    exact checkHoeffding_certified _ _ _ h
 
 /-- Soundness: if the check accepts a certificate, every claim holds. -/
 theorem check_sound (c : Certificate) (h : check c = true) : CertificateHolds c := by

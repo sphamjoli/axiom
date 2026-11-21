@@ -1,5 +1,6 @@
 import AxiomCheck.Certificate
-import Batteries.Data.Rat.Lemmas
+import AxiomCheck.Rational
+import AxiomCheck.Estimate
 
 /-!
 # Semantics
@@ -16,47 +17,6 @@ trusted base stays small.
 -/
 
 namespace AxiomCheck.Semantics
-
-/-! ## Rational helpers -/
-
-/-- The absolute value of a rational. -/
-def ratAbs (x : Rat) : Rat := if x < 0 then -x else x
-
-/-- `x` raised to the natural power `k`. -/
-def ratPow (x : Rat) : Nat → Rat
-  | 0 => 1
-  | k + 1 => ratPow x k * x
-
-/-- Multiplies `acc` by `x` `k` times, in a tail-recursive loop so that
-evaluating a large power does not exhaust the interpreter's stack. -/
-def ratPowLoop (x : Rat) : Rat → Nat → Rat
-  | acc, 0 => acc
-  | acc, k + 1 => ratPowLoop x (acc * x) k
-
-/-- Starting from `x ^ j`, the loop computes `x ^ (j + k)`. -/
-theorem ratPowLoop_eq (x : Rat) (j k : Nat) :
-    ratPowLoop x (ratPow x j) k = ratPow x (j + k) := by
-  induction k generalizing j with
-  | zero => rfl
-  | succ k ih =>
-    show ratPowLoop x (ratPow x (j + 1)) k = _
-    rw [ih, Nat.add_right_comm, Nat.add_assoc]
-
-/-- `x` raised to the natural power `k`, by the loop. -/
-def ratPowFast (x : Rat) (k : Nat) : Rat := ratPowLoop x 1 k
-
-/-- Compiled code evaluates `ratPow` with the loop. -/
-@[csimp] theorem ratPow_eq_fast : @ratPow = @ratPowFast := by
-  funext x k
-  have h := ratPowLoop_eq x 0 k
-  rw [Nat.zero_add] at h
-  exact h.symm
-
-/-- The sum of a list of rationals. -/
-def ratSum (xs : List Rat) : Rat := xs.foldr (· + ·) 0
-
-/-- The sum of `f i` over every state `i` of an `n`-state model. -/
-def sumFin {n : Nat} (f : Fin n → Rat) : Rat := ratSum ((List.finRange n).map f)
 
 /-! ## Chains -/
 
@@ -250,6 +210,13 @@ def ParametricCertified (a b : Interval) : Prop :=
     ((Fraction.toRat a.hi) + (Fraction.toRat b.hi) < 2 ∨
       ((Fraction.toRat a.hi) + (Fraction.toRat b.hi) ≤ 2 ∧ (a.hiOpen = true ∨ b.hiOpen = true)))
 
+/-- The decidable facts an `Estimate` claim is checked against: `δ > 0` and
+`2 ≤ δ · L` for the rational lower bound `L` on `exp (2 n ε²)`, so the
+sample count `n` meets Hoeffding's bound. They say nothing about the
+estimated value. -/
+def EstimateCertified (n : Nat) (ε δ : Rat) : Prop :=
+  0 < δ ∧ 2 ≤ δ * Estimate.expLower (2 * (n : Rat) * (ε * ε))
+
 /-- The parametric facts are decidable by exact arithmetic. -/
 instance (a b : Interval) : Decidable (ParametricCertified a b) := by
   unfold ParametricCertified
@@ -290,6 +257,8 @@ def ClaimHolds (c : Certificate) : Claim → Prop
       (expected.map Fraction.toRat) (failureToRat failure)
   | .parametricContraction =>
     ∃ a b, parametricModel c = some (a, b) ∧ ParametricCertified a b
+  | .estimate _ _ samples epsilon delta _ =>
+    EstimateCertified samples (Fraction.toRat epsilon) (Fraction.toRat delta)
 
 /-- Every claim of the certificate holds. -/
 def CertificateHolds (c : Certificate) : Prop :=

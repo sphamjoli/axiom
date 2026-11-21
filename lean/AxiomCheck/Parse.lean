@@ -15,7 +15,9 @@ models; step and attempt counts are capped at `maxCount`. Version 4 adds the
 parametric model `{"parametric": {"a": interval, "b": interval}}`, where an
 interval is `{"lo": f, "hi": f, "lo_end": e, "hi_end": e}` with probability
 ends and each `e` the string `open` or `closed` (the JSON reader has no
-booleans), and the `ParametricContraction` claim kind for it.
+booleans), and the `ParametricContraction` claim kind for it. Version 4 also
+adds the `Estimate` claim kind, whose sample count is capped at `maxSamples`
+and whose seed must fit in 64 bits.
 
 The reader leaves the arithmetic of claims to the claim check: the sum of each
 row, and whether a fixed point, contraction factor, convergence bound or
@@ -141,6 +143,30 @@ def matrix (value : Value) : Except String (List (List Fraction)) := do
   else if rows.any (·.length != rows.length) then .error "matrix is not square"
   else rows.mapM (·.mapM fraction)
 
+/-- The largest sample count of an `Estimate` claim. It bounds the work of
+reproducing the estimate; checking it costs the same for every count,
+because the Hoeffding check clamps its argument. -/
+def maxSamples : Nat := 10000000
+
+/-- The `seed` of an `Estimate` claim: an integer below `2 ^ 64`. -/
+def seed : Value → Except String Nat
+  | .nat n => if n ≥ 2 ^ 64 then .error "seed is above the limit" else .ok n
+  | _ => .error "seed must be an integer"
+
+/-- The `samples` of an `Estimate` claim: an integer no greater than
+`maxSamples`. -/
+def samples : Value → Except String Nat
+  | .nat n => if n > maxSamples then .error "samples are above the limit" else .ok n
+  | _ => .error "samples must be an integer"
+
+/-- A tolerance or failure probability: a canonical fraction strictly
+between zero and one. -/
+def openUnit (value : Value) : Except String Fraction := do
+  let f ← fraction value
+  if f.num == 0 || f.num == f.den then
+    .error "epsilon and delta must lie strictly between zero and one"
+  else pure f
+
 /-- The `kind` of a claim object. The object's full set of fields is checked
 afterwards, once the kind says which fields it must have. -/
 def claimKind : Value → Except String String
@@ -206,6 +232,19 @@ def claim (version : Nat) (model : Model) (value : Value) : Except String Claim 
     let .parametric _ _ := model | .error "claim kind needs a parametric model"
     let _ ← exactMembers ["kind"] value
     pure .parametricContraction
+  | "Estimate" =>
+    if version < 4 then .error "claim kind needs certificate version 4"
+    let members ← exactMembers
+      ["kind", "quantity", "value", "samples", "epsilon", "delta", "seed"] value
+    let quantity ← match ← field members "quantity" with
+      | .str "steady-state" => do requireTwoState 4 version model; pure Quantity.steadyState
+      | .str "success" => do
+        let .retry _ := model | .error "claim kind needs a retry model"
+        pure Quantity.success
+      | _ => .error "unknown estimate quantity"
+    pure (.estimate quantity (← fraction (← field members "value"))
+      (← samples (← field members "samples")) (← openUnit (← field members "epsilon"))
+      (← openUnit (← field members "delta")) (← seed (← field members "seed")))
   | _ => .error "unknown claim kind"
 
 /-- An interval end: `open` excludes the end value, `closed` includes it. -/

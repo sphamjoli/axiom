@@ -133,4 +133,20 @@ theorem checkHoeffding_sound (n : ℕ) (ε δ : ℚ) (h : checkHoeffding n ε δ
   rw [hneg, Real.exp_neg, ← div_eq_mul_inv, div_le_iff₀ (Real.exp_pos _)]
   exact h2
 
+/-- The full meaning of an accepted `Estimate` claim: Hoeffding's failure
+bound for its sample count, tolerance and failure probability is at most
+the failure probability, so `samples` independent samples in `[0, 1]` have a
+mean within `epsilon` of the true mean with probability at least
+`1 - delta`. The theorem says nothing about `value`: the checker never
+verifies that the stated value is correct, only that the stated sample
+count suffices. -/
+theorem estimate_means (c : Certificate) (h : Check.check c = true) (quantity : Quantity)
+    (value : Fraction) (samples : ℕ) (epsilon delta : Fraction) (seed : ℕ)
+    (hmem : Claim.estimate quantity value samples epsilon delta seed ∈ c.claims) :
+    2 * Real.exp (-2 * (samples : ℝ) * ((Fraction.toRat epsilon : ℚ) : ℝ) ^ 2) ≤
+      ((Fraction.toRat delta : ℚ) : ℝ) := by
+  have hc : Check.checkClaim c (.estimate quantity value samples epsilon delta seed) = true :=
+    List.all_eq_true.mp h _ hmem
+  exact checkHoeffding_sound samples _ _ hc
+
 end AxiomCheck.Estimate
