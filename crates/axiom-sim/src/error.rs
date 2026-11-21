@@ -29,3 +29,19 @@ pub enum SimError {
     #[error("more hits than samples")]
     HitsExceedSamples,
 }
+
+impl SimError {
+    /// A stable kebab-case name for the error, the same on every machine.
+    #[must_use]
+    pub const fn code(&self) -> &'static str {
+        match self {
+            Self::Parametric => "parametric-model",
+            Self::StateOutOfRange(_) => "state-out-of-range",
+            Self::InvalidEpsilon => "invalid-epsilon",
+            Self::InvalidDelta => "invalid-delta",
+            Self::SamplesUnreachable => "samples-unreachable",
+            Self::TooFewSamples { .. } => "too-few-samples",
+            Self::HitsExceedSamples => "hits-exceed-samples",
+        }
+    }
+}
