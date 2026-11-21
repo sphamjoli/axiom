@@ -132,6 +132,27 @@ pub(crate) enum ClaimDocument {
         failure_after: Option<FailureAfterDocument>,
     },
     ParametricContraction,
+    Estimate(EstimateDocument),
+}
+
+/// The fields of an `Estimate` claim.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct EstimateDocument {
+    pub(crate) quantity: QuantityDocument,
+    pub(crate) value: FractionText,
+    pub(crate) samples: u64,
+    pub(crate) epsilon: FractionText,
+    pub(crate) delta: FractionText,
+    pub(crate) seed: u64,
+}
+
+/// The quantity an `Estimate` claim estimates.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum QuantityDocument {
+    SteadyState,
+    Success,
 }
 
 /// Reads an optional field that, when present, must hold a value: `null` is

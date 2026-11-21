@@ -1,0 +1,1 @@
+{"format":"axiom-certificate","version":4,"model":{"retry":{"success":{"num":"3","den":"10"}}},"claims":[{"kind":"Estimate","quantity":"expected-attempts","value":{"num":"1","den":"2"},"samples":38005,"epsilon":{"num":"1","den":"100"},"delta":{"num":"1","den":"1000"},"seed":42}]}

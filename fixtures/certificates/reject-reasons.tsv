@@ -12,6 +12,16 @@ convergence-bound-too-many-steps.json	CountOutOfRange	count is above the limit
 convergence-bound-zero-tolerance.json	InvalidClaimFraction	tolerance must be positive
 does-not-sum-to-one.json	TransitionRow	check
 duplicate-key.json	Json	unexpected or missing field
+estimate-delta-one.json	InvalidClaimFraction	epsilon and delta must lie strictly between zero and one
+estimate-epsilon-zero.json	InvalidClaimFraction	epsilon and delta must lie strictly between zero and one
+estimate-missing-seed.json	Json	unexpected or missing field
+estimate-samples-above-limit.json	SamplesOutOfRange	samples are above the limit
+estimate-seed-above-limit.json	Json	seed is above the limit
+estimate-steady-state-on-retry.json	NotChain	claim kind needs a chain model
+estimate-steady-state-three-states.json	NotTwoState	claim kind needs a two-state model
+estimate-success-on-chain.json	NotRetry	claim kind needs a retry model
+estimate-too-few-samples.json	FalseClaim	check
+estimate-unknown-quantity.json	Json	unknown estimate quantity
 factor-as-number.json	Json	expected an object
 factor-double-minus.json	InvalidClaimFraction	fraction is not in canonical form
 factor-minus-only.json	InvalidClaimFraction	fraction is not in canonical form
@@ -83,6 +93,7 @@ v1-fixed-point.json	ClaimNeedsVersion	claim kind needs certificate version 2
 v2-convergence-bound.json	ClaimNeedsVersion	claim kind needs certificate version 3
 v2-retry-model.json	ModelNeedsVersion	retry model needs certificate version 3
 v2-termination.json	ClaimNeedsVersion	claim kind needs certificate version 3
+v3-estimate.json	ClaimNeedsVersion	claim kind needs certificate version 4
 v3-parametric-contraction.json	ClaimNeedsVersion	claim kind needs certificate version 4
 v3-parametric-model.json	ModelNeedsVersion	parametric model needs certificate version 4
 version-exponent.json	Json	invalid JSON at character 44: only plain integers are allowed

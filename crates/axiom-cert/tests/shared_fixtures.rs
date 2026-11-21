@@ -78,6 +78,6 @@ fn every_acceptance_fixture_is_accepted() -> Result<(), TestError> {
         Certificate::from_json(&fs::read_to_string(&path)?)?;
         checked += 1;
     }
-    assert_eq!(checked, 18, "every fixture is checked");
+    assert_eq!(checked, 22, "every fixture is checked");
     Ok(())
 }

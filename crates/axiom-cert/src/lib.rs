@@ -6,7 +6,9 @@
 //! adds `FixedPoint` and `Contraction` claims about two-state models;
 //! version 3 adds `ConvergenceBound` claims about two-state models, the
 //! retry model and `Termination` claims about it; version 4 adds the
-//! parametric model and the `ParametricContraction` claim about it. A
+//! parametric model, the `ParametricContraction` claim about it and the
+//! `Estimate` claim, the only claim whose certainty is estimated rather
+//! than proven. A
 //! certificate is written in the lowest version that can express it, so
 //! certificates of earlier versions are written byte for byte as before.
 //! The format is canonical JSON with every fraction
@@ -21,7 +23,7 @@ mod error;
 mod fraction_text;
 
 pub use certificate::{
-    Certificate, Claim, End, FailureAfter, Interval, MAX_CERTIFICATE_BYTES, MAX_COUNT,
-    MAX_JSON_DEPTH, MAX_JSON_ITEMS, MAX_JSON_MEMBERS, MAX_STATES, Model,
+    Certificate, Claim, End, Estimate, FailureAfter, Interval, MAX_CERTIFICATE_BYTES, MAX_COUNT,
+    MAX_JSON_DEPTH, MAX_JSON_ITEMS, MAX_JSON_MEMBERS, MAX_SAMPLES, MAX_STATES, Model, Quantity,
 };
 pub use error::{CertificateError, ConvergenceBoundError};

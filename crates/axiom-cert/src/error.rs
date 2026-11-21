@@ -139,6 +139,14 @@ pub enum CertificateError {
     /// contracts: the range includes `a + b = 0` or `a + b = 2`.
     #[error("the parameter range includes a chain that does not contract")]
     NoParametricContraction,
+    /// An `Estimate` claim's sample count is above the format's limit.
+    #[error("claim {claim}: sample count is above the limit {limit}")]
+    SamplesOutOfRange {
+        /// The index of the claim in the claim list.
+        claim: usize,
+        /// The largest sample count the format allows.
+        limit: u64,
+    },
     /// A `ParametricContraction` claim in a certificate whose model is not
     /// parametric.
     #[error("claim {claim} needs a parametric model")]
@@ -213,6 +221,7 @@ impl CertificateError {
             Self::EmptyInterval => "empty-interval",
             Self::NoParametricContraction => "no-parametric-contraction",
             Self::NotParametric { .. } => "not-parametric",
+            Self::SamplesOutOfRange { .. } => "samples-out-of-range",
             Self::InvalidRetrySuccess => "invalid-retry-success",
             Self::NotChain { .. } => "not-chain",
             Self::NotRetry { .. } => "not-retry",

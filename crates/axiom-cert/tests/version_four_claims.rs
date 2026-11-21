@@ -1,17 +1,86 @@
-//! Version 4 certificates: writing the parametric model and its
-//! `ParametricContraction` claim. Which version 4 certificates the reader
-//! accepts or rejects is covered by the shared fixtures.
+//! Version 4 certificates: writing the parametric model, its
+//! `ParametricContraction` claim and `Estimate` claims. Which version 4
+//! certificates the reader accepts or rejects is covered by the shared
+//! fixtures; the Hoeffding decision itself is covered in `axiom-sim`.
 
 mod common;
 
-use axiom_cert::{Certificate, CertificateError, End, Interval};
-use axiom_core::Probability;
-use common::TestError;
+use axiom_cert::{Certificate, CertificateError, End, Estimate, Interval, MAX_SAMPLES, Quantity};
+use axiom_core::{Probability, TransitionMatrix, TransitionRow};
+use common::{TestError, ratio};
 use proptest::prelude::{Strategy, prop_assert_eq, prop_oneof, proptest};
 
 /// The golden version 4 certificate for the links model with `a` and `b` in
 /// `]0, 1[`, generated independently of the engine.
 const LINKS_PARAM: &str = include_str!("../../../fixtures/certificates/links-param.json");
+
+/// The golden version 4 certificate for the links model with a steady-state
+/// estimate from seed 42, generated independently of the engine.
+const LINKS_ESTIMATE: &str = include_str!("../../../fixtures/certificates/links-estimate.json");
+
+/// The links model's transition matrix.
+fn links() -> Result<TransitionMatrix, TestError> {
+    let row = |stay: i64, leave: i64, first_stays: bool| -> Result<TransitionRow, TestError> {
+        let (first, second) = if first_stays {
+            (stay, leave)
+        } else {
+            (leave, stay)
+        };
+        Ok(TransitionRow::try_new(vec![
+            Probability::try_from_fraction(first, 10)?,
+            Probability::try_from_fraction(second, 10)?,
+        ])?)
+    };
+    Ok(TransitionMatrix::try_new(vec![
+        row(9, 1, true)?,
+        row(7, 3, false)?,
+    ])?)
+}
+
+/// A steady-state estimate with the golden file's parameters and `samples`.
+fn estimate(samples: u64) -> Result<Estimate, TestError> {
+    Ok(Estimate {
+        quantity: Quantity::SteadyState,
+        value: Probability::try_new(&ratio(9583, 38005))?,
+        samples,
+        epsilon: ratio(1, 100),
+        delta: ratio(1, 1000),
+        seed: 42,
+    })
+}
+
+#[test]
+fn a_steady_state_estimate_reproduces_the_golden_file_byte_for_byte() -> Result<(), TestError> {
+    let certificate = Certificate::strongest(links()?).with_estimate(estimate(38_005)?)?;
+    assert_eq!(certificate.version(), 4);
+    assert_eq!(certificate.to_json()?, LINKS_ESTIMATE);
+    Ok(())
+}
+
+#[test]
+fn the_engine_refuses_an_estimate_the_reader_would_reject() -> Result<(), TestError> {
+    let links = || -> Result<Certificate, TestError> { Ok(Certificate::strongest(links()?)) };
+    assert_eq!(
+        links()?.with_estimate(estimate(38_004)?),
+        Err(CertificateError::FalseClaim { claim: 5 })
+    );
+    assert_eq!(
+        links()?.with_estimate(estimate(MAX_SAMPLES + 1)?),
+        Err(CertificateError::SamplesOutOfRange {
+            claim: 5,
+            limit: MAX_SAMPLES
+        })
+    );
+    let success = Estimate {
+        quantity: Quantity::Success,
+        ..estimate(38_005)?
+    };
+    assert_eq!(
+        links()?.with_estimate(success),
+        Err(CertificateError::NotRetry { claim: 5 })
+    );
+    Ok(())
+}
 
 /// The interval `lo..hi` of tenths with the given ends.
 fn tenths(lo: i64, lo_end: End, hi: i64, hi_end: End) -> Result<Interval, TestError> {
@@ -85,6 +154,31 @@ fn interval() -> impl Strategy<Value = Option<Interval>> {
 }
 
 proptest! {
+    #[test]
+    fn estimate_certificates_round_trip(
+        hits in 0_u64..=1000,
+        extra in 0_u64..=1000,
+        seed in proptest::num::u64::ANY,
+    ) {
+        let fail = |e: TestError| proptest::test_runner::TestCaseError::fail(e.to_string());
+        let samples = 38_005 + extra;
+        let claim = Estimate {
+            quantity: Quantity::Success,
+            value: Probability::try_new(&ratio(i64::try_from(hits).unwrap_or(0), 1000)).map_err(|e| fail(e.into()))?,
+            samples,
+            epsilon: ratio(1, 100),
+            delta: ratio(1, 1000),
+            seed,
+        };
+        let success = Probability::try_from_fraction(3, 10).map_err(|e| fail(e.into()))?;
+        let certificate = Certificate::termination(success, 20)
+            .and_then(|c| c.with_estimate(claim))
+            .map_err(|e| fail(e.into()))?;
+        let text = certificate.to_json().map_err(|e| fail(e.into()))?;
+        let read = Certificate::from_json(&text).map_err(|e| fail(e.into()))?;
+        prop_assert_eq!(read, certificate);
+    }
+
     #[test]
     fn parametric_certificates_round_trip(a in interval(), b in interval()) {
         if let (Some(a), Some(b)) = (a, b)

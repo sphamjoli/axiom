@@ -7,9 +7,9 @@ use num_rational::BigRational;
 use num_traits::{One, Pow, Signed, Zero};
 
 use crate::document::{
-    CertificateDocument, ClaimDocument, EndDocument, FORMAT, FailureAfterDocument,
-    IntervalDocument, ModelDocument, ParametricDocument, RetryDocument, VERSION_1, VERSION_2,
-    VERSION_3, VERSION_4,
+    CertificateDocument, ClaimDocument, EndDocument, EstimateDocument, FORMAT,
+    FailureAfterDocument, IntervalDocument, ModelDocument, ParametricDocument, QuantityDocument,
+    RetryDocument, VERSION_1, VERSION_2, VERSION_3, VERSION_4,
 };
 use crate::error::{CertificateError, ConvergenceBoundError};
 use crate::fraction_text::{FractionText, Sign};
@@ -32,6 +32,11 @@ pub const MAX_STATES: usize = 16;
 /// the engine and the checker compute it in well under a second; checking
 /// is quadratic in the count, which is why the limit is not higher.
 pub const MAX_COUNT: u64 = 1_000;
+
+/// The largest sample count of an `Estimate` claim. It bounds the work of
+/// reproducing the estimate from its seed; checking the count costs the
+/// same for every count, because the Hoeffding bound clamps its argument.
+pub const MAX_SAMPLES: u64 = 10_000_000;
 
 /// The deepest nesting of arrays and objects a certificate may have.
 pub const MAX_JSON_DEPTH: usize = 8;
@@ -152,6 +157,62 @@ pub struct FailureAfter {
     pub probability: Probability,
 }
 
+/// The quantity an [`Estimate`] estimates. Each sample is `0` or `1`, as
+/// Hoeffding's inequality requires.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Quantity {
+    /// For a two-state chain, the probability of being in the second state
+    /// after a fixed number of steps from the first, which approximates the
+    /// steady state. Written `steady-state`.
+    SteadyState,
+    /// For a retry loop, the probability of success within a fixed number of
+    /// attempts. Written `success`.
+    Success,
+}
+
+/// An estimate of a [`Quantity`] from `samples` samples drawn with `seed`.
+///
+/// What a checked `Estimate` claim guarantees is only that `samples`
+/// satisfies Hoeffding's bound for `epsilon` and `delta`: with probability
+/// at least `1 - delta` over the sampling, the sample mean is within
+/// `epsilon` of the true mean. Nothing checks that `value` is that sample
+/// mean, so an estimate is always estimated, never proven.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Estimate {
+    /// What is estimated.
+    pub quantity: Quantity,
+    /// The estimated value, the sample mean.
+    pub value: Probability,
+    /// The number of samples, at most [`MAX_SAMPLES`].
+    pub samples: u64,
+    /// The tolerance, strictly between zero and one.
+    pub epsilon: BigRational,
+    /// The failure probability, strictly between zero and one.
+    pub delta: BigRational,
+    /// The seed the samples were drawn with.
+    pub seed: u64,
+}
+
+impl Estimate {
+    /// Checks a sample count against [`MAX_SAMPLES`] before any sampling,
+    /// so a caller can refuse a count it would take too long to draw.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CertificateError::SamplesOutOfRange`] for claim `claim`
+    /// when `samples` is above [`MAX_SAMPLES`].
+    pub fn check_samples(claim: usize, samples: u64) -> Result<(), CertificateError> {
+        if samples > MAX_SAMPLES {
+            Err(CertificateError::SamplesOutOfRange {
+                claim,
+                limit: MAX_SAMPLES,
+            })
+        } else {
+            Ok(())
+        }
+    }
+}
+
 /// A claim about the embedded model.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
@@ -209,6 +270,10 @@ pub enum Claim {
     /// each such chain then has the unique steady state `a / (a + b)` and
     /// contracts with factor `|1 - a - b| < 1`. Introduced in version 4.
     ParametricContraction,
+    /// An estimate whose sample count satisfies Hoeffding's bound; see
+    /// [`Estimate`]. It is the only claim whose certainty is estimated.
+    /// Introduced in version 4.
+    Estimate(Estimate),
 }
 
 impl Claim {
@@ -218,7 +283,7 @@ impl Claim {
             Self::Mass { .. } => VERSION_1,
             Self::FixedPoint { .. } | Self::Contraction { .. } => VERSION_2,
             Self::ConvergenceBound { .. } | Self::Termination { .. } => VERSION_3,
-            Self::ParametricContraction => VERSION_4,
+            Self::ParametricContraction | Self::Estimate(_) => VERSION_4,
         }
     }
 }
@@ -395,6 +460,22 @@ impl Certificate {
         })
     }
 
+    /// The certificate with `estimate` appended as its last claim.
+    ///
+    /// # Errors
+    ///
+    /// Returns the error the reader would return for the claim: a quantity
+    /// about the wrong kind of model, a sample count above [`MAX_SAMPLES`],
+    /// `epsilon` or `delta` not strictly between zero and one or longer than
+    /// the format's 64 digits, or a sample count that does not meet the
+    /// Hoeffding bound.
+    pub fn with_estimate(mut self, estimate: Estimate) -> Result<Self, CertificateError> {
+        let index = self.claims.len();
+        check_estimate(index, &estimate, &self.model)?;
+        self.claims.push(Claim::Estimate(estimate));
+        Ok(self)
+    }
+
     /// The format version the certificate is written in: the lowest version
     /// that can express the model and every claim, so a certificate of `Mass`
     /// claims only is written as version 1.
@@ -562,6 +643,40 @@ fn parametric_contraction_holds(a: &Interval, b: &Interval) -> bool {
     above_zero && below_two
 }
 
+/// Checks estimate claim `index` against the model, the limits and the
+/// Hoeffding bound, in the order the checker's reader and check apply them:
+/// the quantity's model, the sample count, the range of `epsilon` and
+/// `delta`, then the bound. `axiom_core::hoeffding_holds` is the decision
+/// the Lean checker's `checkHoeffding` makes.
+fn check_estimate(
+    index: usize,
+    estimate: &Estimate,
+    model: &Model,
+) -> Result<(), CertificateError> {
+    match (estimate.quantity, model) {
+        (Quantity::SteadyState, _) => {
+            two_state_chain(index, VERSION_4, VERSION_4, model)?;
+        }
+        (Quantity::Success, Model::Retry { .. }) => {}
+        (Quantity::Success, _) => return Err(CertificateError::NotRetry { claim: index }),
+    }
+    Estimate::check_samples(index, estimate.samples)?;
+    let open_unit = |value: &BigRational| {
+        value.is_positive() && *value < BigRational::one() && FractionText::fits(value)
+    };
+    if !open_unit(&estimate.epsilon) || !open_unit(&estimate.delta) {
+        return Err(CertificateError::InvalidClaimFraction { claim: index });
+    }
+    if !FractionText::fits(estimate.value.value()) {
+        return Err(CertificateError::InvalidClaimFraction { claim: index });
+    }
+    if axiom_core::hoeffding_holds(estimate.samples, &estimate.epsilon, &estimate.delta) {
+        Ok(())
+    } else {
+        Err(CertificateError::FalseClaim { claim: index })
+    }
+}
+
 /// The document form of an interval.
 fn interval_document(interval: &Interval) -> IntervalDocument {
     let end = |end: End| match end {
@@ -687,6 +802,17 @@ fn claim_document(claim: &Claim) -> ClaimDocument {
             tolerance: FractionText::from_fraction(tolerance),
         },
         Claim::ParametricContraction => ClaimDocument::ParametricContraction,
+        Claim::Estimate(estimate) => ClaimDocument::Estimate(EstimateDocument {
+            quantity: match estimate.quantity {
+                Quantity::SteadyState => QuantityDocument::SteadyState,
+                Quantity::Success => QuantityDocument::Success,
+            },
+            value: FractionText::from_fraction(estimate.value.value()),
+            samples: estimate.samples,
+            epsilon: FractionText::from_fraction(&estimate.epsilon),
+            delta: FractionText::from_fraction(&estimate.delta),
+            seed: estimate.seed,
+        }),
         Claim::Termination {
             probability,
             expected_attempts,
@@ -822,13 +948,9 @@ fn parse_claim(
             expected_attempts.as_ref(),
             failure_after.as_ref(),
         ),
+        ClaimDocument::Estimate(document) => parse_estimate(index, version, model, document),
         ClaimDocument::ParametricContraction => {
-            if version < VERSION_4 {
-                return Err(CertificateError::ClaimNeedsVersion {
-                    claim: index,
-                    needed: VERSION_4,
-                });
-            }
+            require_version(index, version, VERSION_4)?;
             let Model::Parametric { a, b } = model else {
                 return Err(CertificateError::NotParametric { claim: index });
             };
@@ -838,6 +960,46 @@ fn parse_claim(
                 Err(false_claim)
             }
         }
+    }
+}
+
+/// Parses an `Estimate` claim and checks it with [`check_estimate`].
+fn parse_estimate(
+    index: usize,
+    version: u32,
+    model: &Model,
+    document: &EstimateDocument,
+) -> Result<Claim, CertificateError> {
+    require_version(index, version, VERSION_4)?;
+    let fraction = |text: &FractionText| {
+        text.to_fraction(Sign::Forbidden)
+            .ok_or(CertificateError::InvalidClaimFraction { claim: index })
+    };
+    let estimate = Estimate {
+        quantity: match document.quantity {
+            QuantityDocument::SteadyState => Quantity::SteadyState,
+            QuantityDocument::Success => Quantity::Success,
+        },
+        value: claim_probability(index, &document.value)?,
+        samples: document.samples,
+        epsilon: fraction(&document.epsilon)?,
+        delta: fraction(&document.delta)?,
+        seed: document.seed,
+    };
+    check_estimate(index, &estimate, model)?;
+    Ok(Claim::Estimate(estimate))
+}
+
+/// Rejects claim `index` of a kind that needs version `needed` in a
+/// certificate of an older `version`.
+fn require_version(index: usize, version: u32, needed: u32) -> Result<(), CertificateError> {
+    if version < needed {
+        Err(CertificateError::ClaimNeedsVersion {
+            claim: index,
+            needed,
+        })
+    } else {
+        Ok(())
     }
 }
 

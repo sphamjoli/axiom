@@ -48,6 +48,7 @@ fn every_certificate_error() -> Vec<CertificateError> {
         CertificateError::EmptyInterval,
         CertificateError::NoParametricContraction,
         CertificateError::NotParametric { claim: 2 },
+        CertificateError::SamplesOutOfRange { claim: 2, limit: 7 },
         CertificateError::InvalidRetrySuccess,
         CertificateError::NotChain { claim: 2 },
         CertificateError::NotRetry { claim: 2 },
@@ -127,6 +128,10 @@ fn every_certificate_error_has_a_stable_distinct_code_and_fixed_message() {
             "the parameter range includes a chain that does not contract",
         ),
         ("not-parametric", "claim 2 needs a parametric model"),
+        (
+            "samples-out-of-range",
+            "claim 2: sample count is above the limit 7",
+        ),
         (
             "invalid-retry-success",
             "retry success is not a canonical probability",
