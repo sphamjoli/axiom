@@ -55,6 +55,13 @@ fn d_star_within_one_hundredth_at_confidence_0_999_needs_38005_samples() -> Resu
     ensure(!hoeffding_holds(38_004, &epsilon, &delta), "38004 does not")
 }
 
+/// `ln(2 · 10^9) / (2 · (1/50)^2) = 26770.52...`, the Lean tests' second case.
+#[test]
+fn one_fiftieth_at_one_in_a_billion_needs_26771_samples() -> Result<(), TestError> {
+    let samples = required_samples(&ratio(1, 50), &ratio(1, 1_000_000_000))?;
+    ensure(samples == 26_771, format!("required {samples}"))
+}
+
 #[test]
 fn estimate_of_d_star_is_within_tolerance() -> Result<(), TestError> {
     let epsilon = ratio(1, 100);
