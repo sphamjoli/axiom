@@ -1,0 +1,35 @@
+# Engine functions covered by proof 3 and the pinned translation tools.
+#
+# scripts/generateEngine.sh translates every function below with Charon and
+# Aeneas into lean-engine/AxiomEngine/Generated/, and scripts/checkProof3.sh
+# fails if one leaves the translatable subset or the generated Lean drifts.
+
+[tools]
+aeneas = "nightly-2026.10.28-399081f"
+charon = "2ec7e964e1032c59220e726840a9ac7d7684be2f"
+rust_nightly = "nightly-2026-09-17"
+lean = "leanprover/lean4:v4.35.0"
+
+[extraction]
+start_from = "axiom_core::kernel"
+opaque = "axiom_core::exact_rational"
+
+[[covered]]
+rust = "axiom_core::kernel::complement"
+public = "Probability::complement"
+lean = "AxiomEngine.kernel.complement"
+
+[[covered]]
+rust = "axiom_core::kernel::contraction_factor"
+public = "TwoStateChain::contraction_factor"
+lean = "AxiomEngine.kernel.contraction_factor"
+
+[[covered]]
+rust = "axiom_core::kernel::steady_state"
+public = "TwoStateChain::steady_state"
+lean = "AxiomEngine.kernel.steady_state"
+
+[[covered]]
+rust = "axiom_core::kernel::affine_apply"
+public = "AffineUpdate::apply"
+lean = "AxiomEngine.kernel.affine_apply"

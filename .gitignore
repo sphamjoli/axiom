@@ -3,6 +3,10 @@
 
 # Lean build output and fetched dependencies
 /lean/.lake/
+/lean-engine/.lake/
+
+# Charon and Aeneas binaries fetched by scripts/installAeneas.sh
+/.aeneas/
 
 # Gate script dependencies
 node_modules/
