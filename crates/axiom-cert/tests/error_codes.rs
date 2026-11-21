@@ -14,7 +14,7 @@ fn every_certificate_error() -> Vec<CertificateError> {
         CertificateError::Json { line: 2, column: 3 },
         CertificateError::JsonLimit,
         CertificateError::UnsupportedFormat,
-        CertificateError::UnsupportedVersion(4),
+        CertificateError::UnsupportedVersion(5),
         CertificateError::TooManyStates {
             states: 5,
             limit: 4,
@@ -44,6 +44,10 @@ fn every_certificate_error() -> Vec<CertificateError> {
         },
         CertificateError::ModelForm,
         CertificateError::ModelNeedsVersion { needed: 3 },
+        CertificateError::InvalidInterval,
+        CertificateError::EmptyInterval,
+        CertificateError::NoParametricContraction,
+        CertificateError::NotParametric { claim: 2 },
         CertificateError::InvalidRetrySuccess,
         CertificateError::NotChain { claim: 2 },
         CertificateError::NotRetry { claim: 2 },
@@ -81,7 +85,7 @@ fn every_certificate_error_has_a_stable_distinct_code_and_fixed_message() {
             "unsupported-format",
             "certificate format is not axiom-certificate",
         ),
-        ("unsupported-version", "unsupported certificate version 4"),
+        ("unsupported-version", "unsupported certificate version 5"),
         ("too-many-states", "model has 5 states; the limit is 4"),
         (
             "non-canonical-fraction",
@@ -107,12 +111,22 @@ fn every_certificate_error_has_a_stable_distinct_code_and_fixed_message() {
         ),
         (
             "model-form",
-            "model must have exactly one of rows and retry",
+            "model must have exactly one of rows, retry and parametric",
         ),
         (
             "model-needs-version",
-            "retry model needs certificate version 3",
+            "model kind needs certificate version 3",
         ),
+        (
+            "invalid-interval",
+            "interval end is not a canonical probability",
+        ),
+        ("empty-interval", "interval is empty"),
+        (
+            "no-parametric-contraction",
+            "the parameter range includes a chain that does not contract",
+        ),
+        ("not-parametric", "claim 2 needs a parametric model"),
         (
             "invalid-retry-success",
             "retry success is not a canonical probability",

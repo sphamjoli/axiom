@@ -31,8 +31,8 @@ identity-convergence-bound.json	FalseClaim	check
 identity-fixed-point.json	FalseClaim	check
 leading-zero.json	NonCanonicalFraction	fraction is not in canonical form
 mass-with-signed-entry.json	NonCanonicalFraction	fraction is not in canonical form
-model-empty.json	ModelForm	model must have exactly one of rows and retry
-model-rows-and-retry.json	ModelForm	model must have exactly one of rows and retry
+model-empty.json	ModelForm	model must have exactly one of rows, retry and parametric
+model-rows-and-retry.json	ModelForm	model must have exactly one of rows, retry and parametric
 no-break-space-whitespace.json	Json	invalid JSON at character 0: unexpected character
 no-claims.json	NoClaims	certificate makes no claims
 non-stochastic-contraction.json	TransitionRow	check
@@ -41,6 +41,14 @@ not-lowest-terms.json	NonCanonicalFraction	fraction is not in canonical form
 not-square.json	TransitionMatrix	matrix is not square
 nul-in-format.json	UnsupportedFormat	certificate format is not axiom-certificate
 one-state-contraction.json	NotTwoState	claim kind needs a two-state model
+parametric-contraction-on-chain.json	NotParametric	claim kind needs a parametric model
+parametric-end-above-one.json	InvalidInterval	entry is above one
+parametric-mass.json	NotChain	claim kind needs a chain model
+parametric-open-point-interval.json	EmptyInterval	interval is empty
+parametric-reversed-interval.json	EmptyInterval	interval is empty
+parametric-sum-two-included.json	FalseClaim	check
+parametric-sum-zero-included.json	FalseClaim	check
+parametric-unknown-end.json	Json	interval end must be open or closed
 periodic-contraction.json	FalseClaim	check
 periodic-convergence-bound.json	FalseClaim	check
 repeated-claim.json	DuplicateClaim	a claim is repeated
@@ -75,8 +83,10 @@ v1-fixed-point.json	ClaimNeedsVersion	claim kind needs certificate version 2
 v2-convergence-bound.json	ClaimNeedsVersion	claim kind needs certificate version 3
 v2-retry-model.json	ModelNeedsVersion	retry model needs certificate version 3
 v2-termination.json	ClaimNeedsVersion	claim kind needs certificate version 3
+v3-parametric-contraction.json	ClaimNeedsVersion	claim kind needs certificate version 4
+v3-parametric-model.json	ModelNeedsVersion	parametric model needs certificate version 4
 version-exponent.json	Json	invalid JSON at character 44: only plain integers are allowed
-version-four.json	UnsupportedVersion	unsupported certificate version
+version-five.json	UnsupportedVersion	unsupported certificate version
 version-negative-zero.json	Json	invalid JSON at character 40: unexpected character
 wrong-contraction-factor.json	FalseClaim	check
 wrong-fixed-point.json	FalseClaim	check

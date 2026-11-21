@@ -117,14 +117,34 @@ pub enum CertificateError {
         /// The number of states in the model.
         states: usize,
     },
-    /// The model has both or neither of `rows` and `retry`.
-    #[error("model must have exactly one of rows and retry")]
+    /// The model does not have exactly one of `rows`, `retry` and
+    /// `parametric`.
+    #[error("model must have exactly one of rows, retry and parametric")]
     ModelForm,
-    /// A retry model in a certificate whose version does not include it.
-    #[error("retry model needs certificate version {needed}")]
+    /// A retry or parametric model in a certificate whose version does not
+    /// include it.
+    #[error("model kind needs certificate version {needed}")]
     ModelNeedsVersion {
-        /// The lowest version that includes the retry model.
+        /// The lowest version that includes the model kind.
         needed: u32,
+    },
+    /// An end of a parametric model's interval is not a canonical
+    /// probability.
+    #[error("interval end is not a canonical probability")]
+    InvalidInterval,
+    /// A parametric model's interval contains no value.
+    #[error("interval is empty")]
+    EmptyInterval,
+    /// The engine cannot claim that every chain in the parametric range
+    /// contracts: the range includes `a + b = 0` or `a + b = 2`.
+    #[error("the parameter range includes a chain that does not contract")]
+    NoParametricContraction,
+    /// A `ParametricContraction` claim in a certificate whose model is not
+    /// parametric.
+    #[error("claim {claim} needs a parametric model")]
+    NotParametric {
+        /// The index of the claim in the claim list.
+        claim: usize,
     },
     /// The retry model's success probability is not a canonical probability.
     #[error("retry success is not a canonical probability")]
@@ -189,6 +209,10 @@ impl CertificateError {
             Self::NotTwoState { .. } => "not-two-state",
             Self::ModelForm => "model-form",
             Self::ModelNeedsVersion { .. } => "model-needs-version",
+            Self::InvalidInterval => "invalid-interval",
+            Self::EmptyInterval => "empty-interval",
+            Self::NoParametricContraction => "no-parametric-contraction",
+            Self::NotParametric { .. } => "not-parametric",
             Self::InvalidRetrySuccess => "invalid-retry-success",
             Self::NotChain { .. } => "not-chain",
             Self::NotRetry { .. } => "not-retry",

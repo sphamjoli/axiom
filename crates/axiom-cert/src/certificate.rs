@@ -7,8 +7,9 @@ use num_rational::BigRational;
 use num_traits::{One, Pow, Signed, Zero};
 
 use crate::document::{
-    CertificateDocument, ClaimDocument, FORMAT, FailureAfterDocument, ModelDocument, RetryDocument,
-    VERSION_1, VERSION_2, VERSION_3,
+    CertificateDocument, ClaimDocument, EndDocument, FORMAT, FailureAfterDocument,
+    IntervalDocument, ModelDocument, ParametricDocument, RetryDocument, VERSION_1, VERSION_2,
+    VERSION_3, VERSION_4,
 };
 use crate::error::{CertificateError, ConvergenceBoundError};
 use crate::fraction_text::{FractionText, Sign};
@@ -44,6 +45,10 @@ pub const MAX_JSON_ITEMS: usize = 64;
 /// The model a certificate embeds.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "a certificate holds one model, so the larger size is paid once"
+)]
 pub enum Model {
     /// A Markov chain, given by its transition matrix.
     Chain(TransitionMatrix),
@@ -53,6 +58,88 @@ pub enum Model {
         /// The probability that one attempt succeeds.
         success: Probability,
     },
+    /// The two-state chain `[[1 - a, a], [b, 1 - b]]` for every `a` in the
+    /// interval `a` and every `b` in the interval `b`: `a` is the
+    /// probability of leaving the first state and `b` that of leaving the
+    /// second. Introduced in version 4.
+    Parametric {
+        /// The range of the probability of leaving the first state.
+        a: Interval,
+        /// The range of the probability of leaving the second state.
+        b: Interval,
+    },
+}
+
+/// Whether an end of an [`Interval`] belongs to it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum End {
+    /// The end value is excluded, as `0` is from `]0, 1]`.
+    Open,
+    /// The end value is included, as `1` is in `]0, 1]`.
+    Closed,
+}
+
+/// A non-empty interval of probabilities, each end open or closed, such as
+/// `]0, 1[`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Interval {
+    lo: Probability,
+    lo_end: End,
+    hi: Probability,
+    hi_end: End,
+}
+
+impl Interval {
+    /// The interval from `lo` to `hi` with the given ends.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CertificateError::EmptyInterval`] when no probability lies
+    /// in it: `lo > hi`, or `lo = hi` with an open end. An empty range would
+    /// make every claim about it vacuously true.
+    pub fn try_new(
+        lo: Probability,
+        lo_end: End,
+        hi: Probability,
+        hi_end: End,
+    ) -> Result<Self, CertificateError> {
+        let non_empty =
+            lo.value() < hi.value() || (lo == hi && lo_end == End::Closed && hi_end == End::Closed);
+        if non_empty {
+            Ok(Self {
+                lo,
+                lo_end,
+                hi,
+                hi_end,
+            })
+        } else {
+            Err(CertificateError::EmptyInterval)
+        }
+    }
+
+    /// The lower end's value.
+    #[must_use]
+    pub fn lo(&self) -> &Probability {
+        &self.lo
+    }
+
+    /// Whether the lower end belongs to the interval.
+    #[must_use]
+    pub fn lo_end(&self) -> End {
+        self.lo_end
+    }
+
+    /// The upper end's value.
+    #[must_use]
+    pub fn hi(&self) -> &Probability {
+        &self.hi
+    }
+
+    /// Whether the upper end belongs to the interval.
+    #[must_use]
+    pub fn hi_end(&self) -> End {
+        self.hi_end
+    }
 }
 
 /// The claim that each of the first `attempts` attempts of a retry loop
@@ -117,6 +204,11 @@ pub enum Claim {
         /// The probability that a number of attempts all fail.
         failure_after: Option<FailureAfter>,
     },
+    /// The model is parametric, and for every `a` and `b` in range
+    /// `0 < a + b < 2`. By `TwoState.parametric` in the checker's theorems,
+    /// each such chain then has the unique steady state `a / (a + b)` and
+    /// contracts with factor `|1 - a - b| < 1`. Introduced in version 4.
+    ParametricContraction,
 }
 
 impl Claim {
@@ -126,6 +218,7 @@ impl Claim {
             Self::Mass { .. } => VERSION_1,
             Self::FixedPoint { .. } | Self::Contraction { .. } => VERSION_2,
             Self::ConvergenceBound { .. } | Self::Termination { .. } => VERSION_3,
+            Self::ParametricContraction => VERSION_4,
         }
     }
 }
@@ -283,6 +376,25 @@ impl Certificate {
         })
     }
 
+    /// A certificate for the parametric two-state chain with `a` and `b` in
+    /// their intervals: one [`Claim::ParametricContraction`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CertificateError::NoParametricContraction`] when the range
+    /// includes a chain with `a + b = 0`, which never moves and so has no
+    /// unique steady state, or with `a + b = 2`, which swaps its states every
+    /// step and so never settles.
+    pub fn parametric(a: Interval, b: Interval) -> Result<Self, CertificateError> {
+        if !parametric_contraction_holds(&a, &b) {
+            return Err(CertificateError::NoParametricContraction);
+        }
+        Ok(Self {
+            model: Model::Parametric { a, b },
+            claims: vec![Claim::ParametricContraction],
+        })
+    }
+
     /// The format version the certificate is written in: the lowest version
     /// that can express the model and every claim, so a certificate of `Mass`
     /// claims only is written as version 1.
@@ -291,6 +403,7 @@ impl Certificate {
         let model = match self.model {
             Model::Chain(_) => VERSION_1,
             Model::Retry { .. } => VERSION_3,
+            Model::Parametric { .. } => VERSION_4,
         };
         self.claims.iter().map(Claim::version).fold(model, u32::max)
     }
@@ -306,7 +419,7 @@ impl Certificate {
     pub fn matrix(&self) -> Option<&TransitionMatrix> {
         match &self.model {
             Model::Chain(matrix) => Some(matrix),
-            Model::Retry { .. } => None,
+            Model::Retry { .. } | Model::Parametric { .. } => None,
         }
     }
 
@@ -330,11 +443,21 @@ impl Certificate {
             Model::Chain(matrix) => ModelDocument {
                 rows: Some(matrix.rows().iter().map(row_text).collect()),
                 retry: None,
+                parametric: None,
             },
             Model::Retry { success } => ModelDocument {
                 rows: None,
                 retry: Some(RetryDocument {
                     success: FractionText::from_fraction(success.value()),
+                }),
+                parametric: None,
+            },
+            Model::Parametric { a, b } => ModelDocument {
+                rows: None,
+                retry: None,
+                parametric: Some(ParametricDocument {
+                    a: interval_document(a),
+                    b: interval_document(b),
                 }),
             },
         };
@@ -349,7 +472,7 @@ impl Certificate {
         Ok(text)
     }
 
-    /// Reads and validates a version 1, 2 or 3 certificate.
+    /// Reads and validates a version 1, 2, 3 or 4 certificate.
     ///
     /// Whitespace and the order of keys within an object do not matter; every
     /// value must be in its canonical form. The size of the matrix is checked
@@ -364,8 +487,10 @@ impl Certificate {
     ///
     /// Returns an error for text larger than [`MAX_CERTIFICATE_BYTES`],
     /// malformed JSON, unknown or repeated fields, a wrong `format` or
-    /// `version`, a model with both or neither of `rows` and `retry`, a retry
-    /// model before version 3, a non-canonical fraction, an entry that is not
+    /// `version`, a model without exactly one of `rows`, `retry` and
+    /// `parametric`, a retry model before version 3, a parametric model
+    /// before version 4, an empty or non-canonical interval, a
+    /// non-canonical fraction, an entry that is not
     /// a probability, a row that does not sum to one, rows that do not form a
     /// square matrix, no claims, a repeated claim, a claim about a missing
     /// row, a claim kind the version does not include, a claim about the
@@ -385,12 +510,25 @@ impl Certificate {
         if document.format != FORMAT {
             return Err(CertificateError::UnsupportedFormat);
         }
-        if !(VERSION_1..=VERSION_3).contains(&document.version) {
+        if !(VERSION_1..=VERSION_4).contains(&document.version) {
             return Err(CertificateError::UnsupportedVersion(document.version));
         }
-        let model = match (document.model.rows, document.model.retry) {
-            (Some(rows), None) => Model::Chain(parse_matrix(&rows)?),
-            (None, Some(retry)) => {
+        let model = match (
+            document.model.rows,
+            document.model.retry,
+            document.model.parametric,
+        ) {
+            (Some(rows), None, None) => Model::Chain(parse_matrix(&rows)?),
+            (None, None, Some(parametric)) => {
+                if document.version < VERSION_4 {
+                    return Err(CertificateError::ModelNeedsVersion { needed: VERSION_4 });
+                }
+                Model::Parametric {
+                    a: parse_interval(&parametric.a)?,
+                    b: parse_interval(&parametric.b)?,
+                }
+            }
+            (None, Some(retry), None) => {
                 if document.version < VERSION_3 {
                     return Err(CertificateError::ModelNeedsVersion { needed: VERSION_3 });
                 }
@@ -406,6 +544,55 @@ impl Certificate {
         let claims = parse_claims(&document.claims, document.version, &model)?;
         Ok(Self { model, claims })
     }
+}
+
+/// Whether `0 < a + b < 2` for every `a` and `b` in their intervals. The sum
+/// is affine, so its infimum over the box is the sum of the lower ends,
+/// reached only when both are closed, and its supremum the sum of the upper
+/// ends, reached only when both are closed. Both intervals lie in `[0, 1]`
+/// because their ends are probabilities. The Lean checker's
+/// `checkParametric` decides the same.
+fn parametric_contraction_holds(a: &Interval, b: &Interval) -> bool {
+    let lo_sum = a.lo.value() + b.lo.value();
+    let hi_sum = a.hi.value() + b.hi.value();
+    let two = BigRational::from_integer(BigInt::from(2));
+    let either_open = |first: End, second: End| first == End::Open || second == End::Open;
+    let above_zero = lo_sum.is_positive() || either_open(a.lo_end, b.lo_end);
+    let below_two = hi_sum < two || either_open(a.hi_end, b.hi_end);
+    above_zero && below_two
+}
+
+/// The document form of an interval.
+fn interval_document(interval: &Interval) -> IntervalDocument {
+    let end = |end: End| match end {
+        End::Open => EndDocument::Open,
+        End::Closed => EndDocument::Closed,
+    };
+    IntervalDocument {
+        lo: FractionText::from_fraction(interval.lo.value()),
+        hi: FractionText::from_fraction(interval.hi.value()),
+        lo_end: end(interval.lo_end),
+        hi_end: end(interval.hi_end),
+    }
+}
+
+/// Parses an interval: canonical probabilities for both ends, and not empty.
+fn parse_interval(document: &IntervalDocument) -> Result<Interval, CertificateError> {
+    let probability = |text: &FractionText| {
+        text.to_fraction(Sign::Forbidden)
+            .and_then(|value| Probability::try_new(&value).ok())
+            .ok_or(CertificateError::InvalidInterval)
+    };
+    let end = |end: EndDocument| match end {
+        EndDocument::Open => End::Open,
+        EndDocument::Closed => End::Closed,
+    };
+    Interval::try_new(
+        probability(&document.lo)?,
+        end(document.lo_end),
+        probability(&document.hi)?,
+        end(document.hi_end),
+    )
 }
 
 /// Rejects JSON nested deeper than [`MAX_JSON_DEPTH`], an object with more
@@ -499,6 +686,7 @@ fn claim_document(claim: &Claim) -> ClaimDocument {
             steps: *steps,
             tolerance: FractionText::from_fraction(tolerance),
         },
+        Claim::ParametricContraction => ClaimDocument::ParametricContraction,
         Claim::Termination {
             probability,
             expected_attempts,
@@ -634,6 +822,22 @@ fn parse_claim(
             expected_attempts.as_ref(),
             failure_after.as_ref(),
         ),
+        ClaimDocument::ParametricContraction => {
+            if version < VERSION_4 {
+                return Err(CertificateError::ClaimNeedsVersion {
+                    claim: index,
+                    needed: VERSION_4,
+                });
+            }
+            let Model::Parametric { a, b } = model else {
+                return Err(CertificateError::NotParametric { claim: index });
+            };
+            if parametric_contraction_holds(a, b) {
+                Ok(Claim::ParametricContraction)
+            } else {
+                Err(false_claim)
+            }
+        }
     }
 }
 

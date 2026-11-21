@@ -1,6 +1,6 @@
 //! The certificate fixtures shared with the Lean checker. Every file in
-//! `fixtures/certificates/reject/` breaks exactly one rule of the version 1,
-//! 2 or 3 format and must be rejected for that rule: `reject-reasons.tsv`
+//! `fixtures/certificates/reject/` breaks exactly one rule of the version 1
+//! to 4 formats and must be rejected for that rule: `reject-reasons.tsv`
 //! names, for each file, the engine's error variant and the Lean checker's
 //! reason (`check` when the reader accepts it and the claim check rejects
 //! it). Every file in `fixtures/certificates/accept/` is valid and must be
@@ -78,6 +78,6 @@ fn every_acceptance_fixture_is_accepted() -> Result<(), TestError> {
         Certificate::from_json(&fs::read_to_string(&path)?)?;
         checked += 1;
     }
-    assert_eq!(checked, 15, "every fixture is checked");
+    assert_eq!(checked, 18, "every fixture is checked");
     Ok(())
 }

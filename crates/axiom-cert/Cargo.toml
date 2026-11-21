@@ -1,6 +1,6 @@
 [package]
 name = "axiom-cert"
-description = "Writing and reading axiom certificates in the version 1 and 2 JSON formats"
+description = "Writing and reading axiom certificates in the version 1 to 4 JSON formats"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

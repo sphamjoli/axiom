@@ -121,8 +121,8 @@ fn rejects_an_unrelated_format() {
 }
 
 #[test]
-fn rejects_versions_other_than_one_to_three() {
-    for version in ["0", "4"] {
+fn rejects_versions_other_than_one_to_four() {
+    for version in ["0", "5"] {
         let text = certificate_text(halves(), 0)
             .replace("\"version\":1", &format!("\"version\":{version}"));
         assert!(matches!(

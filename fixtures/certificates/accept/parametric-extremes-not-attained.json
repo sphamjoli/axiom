@@ -1,0 +1,1 @@
+{"format":"axiom-certificate","version":4,"model":{"parametric":{"a":{"lo":{"num":"0","den":"1"},"hi":{"num":"1","den":"1"},"lo_end":"open","hi_end":"closed"},"b":{"lo":{"num":"0","den":"1"},"hi":{"num":"1","den":"1"},"lo_end":"closed","hi_end":"open"}}},"claims":[{"kind":"ParametricContraction"}]}
