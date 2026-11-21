@@ -267,7 +267,7 @@ pub enum ModelError {
 impl ModelError {
     /// The position of the fault.
     #[must_use]
-    pub fn position(&self) -> Position {
+    pub const fn position(&self) -> Position {
         match self {
             Self::InputTooLarge { at, .. }
             | Self::UnexpectedCharacter { at }
@@ -298,9 +298,11 @@ impl ModelError {
     }
 
     /// A stable kebab-case name for the kind of fault, such as
-    /// `row-not-normalised`, for tests and tools that match on it.
+    /// `row-not-normalised`, the same on every machine, for tests and tools
+    /// that match on it and for the diagnostics of the command line and the
+    /// browser.
     #[must_use]
-    pub fn code(&self) -> &'static str {
+    pub const fn code(&self) -> &'static str {
         match self {
             Self::InputTooLarge { .. } => "input-too-large",
             Self::UnexpectedCharacter { .. } => "unexpected-character",
