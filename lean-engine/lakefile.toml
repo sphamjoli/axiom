@@ -1,0 +1,28 @@
+name = "axiom-engine"
+version = "0.1.0"
+defaultTargets = ["AxiomEngine"]
+
+[leanOptions]
+autoImplicit = false
+relaxedAutoImplicit = false
+
+# The Aeneas Lean library at the commit of the pinned Aeneas release in
+# ../proof3.toml. It pins Lean and mathlib, and lean-toolchain must match it.
+[[require]]
+name = "aeneas"
+git = "https://github.com/AeneasVerif/aeneas"
+rev = "399081f237935f9aa805f2d4a51fd3784aea11a9"
+subDir = "backends/lean"
+
+# The checker's semantics, built from its own source in ../lean with this
+# project's Lean, so the theorems refer to the very definitions the checker
+# uses and no copy can drift. It needs only Batteries, not mathlib.
+[[lean_lib]]
+name = "AxiomCheckSemantics"
+srcDir = "../lean"
+roots = ["AxiomCheck.Rational", "AxiomCheck.Certificate", "AxiomCheck.Estimate", "AxiomCheck.Semantics"]
+
+[[lean_lib]]
+name = "AxiomEngine"
+roots = ["AxiomEngine"]
+moreLeanArgs = ["-DwarningAsError=true"]

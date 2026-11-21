@@ -7,7 +7,7 @@
 # prose may name these words freely. The authority is the kernel audit in
 # scripts/checkLeanAxioms.sh; this check only fails fast without a build.
 # With file arguments it checks those files; without, every .lean file under
-# lean/ outside the .lake build directory.
+# lean/ and lean-engine/ outside the .lake build directories.
 
 set -euo pipefail
 
@@ -24,7 +24,7 @@ done
 if [ "${#files[@]}" -eq 0 ]; then
   while IFS= read -r file; do
     files+=("${file}")
-  done < <(find lean -name '*.lean' -not -path '*/.lake/*' 2>/dev/null)
+  done < <(find lean lean-engine -name '*.lean' -not -path '*/.lake/*' 2>/dev/null)
 fi
 
 [ "${#files[@]}" -eq 0 ] && exit 0
