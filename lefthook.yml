@@ -67,5 +67,7 @@ pre-push:
       run: cargo test --workspace --locked
     - name: lean forbidden constructs
       run: ./scripts/checkLean.sh
+    - name: lean tests
+      run: ./scripts/testLean.sh
     - name: lean axiom audit
       run: ./scripts/checkLeanAxioms.sh

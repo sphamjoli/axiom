@@ -1,4 +1,4 @@
-.PHONY: rust-deny help hooks-install check fmt rust-fmt rust-lint rust-test rust-doc lean-build lean-check lean-cache lean-audit
+.PHONY: lean-test rust-deny help hooks-install check fmt rust-fmt rust-lint rust-test rust-doc lean-build lean-check lean-cache lean-audit
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | sed 's/:.*## /\t/'
@@ -7,7 +7,7 @@ hooks-install: ## Install the lefthook git hooks and the gate script dependencie
 	bun install
 	bunx lefthook install
 
-check: rust-fmt rust-lint rust-test rust-doc lean-check lean-build lean-audit ## Everything CI runs
+check: rust-fmt rust-lint rust-test rust-doc lean-check lean-build lean-test lean-audit ## Everything CI runs
 
 fmt: ## Format Rust sources in place
 	cargo fmt --all
@@ -35,6 +35,9 @@ lean-check: ## Fast textual pre-check for forbidden Lean constructs
 
 lean-build: lean-cache ## Build the Lean checker with warnings as errors
 	cd lean && lake build
+
+lean-test: ## Run the Lean checker tests against the shared fixtures
+	./scripts/testLean.sh
 
 lean-audit: lean-cache ## Fail unless every checker declaration uses only the standard axioms
 	./scripts/checkLeanAxioms.sh
