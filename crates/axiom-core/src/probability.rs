@@ -3,6 +3,9 @@ use num_rational::BigRational;
 use num_traits::{One, Pow, Zero};
 use thiserror::Error;
 
+use crate::exact_rational::ExactRational;
+use crate::kernel;
+
 /// An exact probability: a rational number between zero and one inclusive,
 /// stored in lowest terms.
 ///
@@ -82,7 +85,7 @@ impl Probability {
     /// The probability of the complementary event, `1 - p`.
     #[must_use]
     pub fn complement(&self) -> Self {
-        Self(BigRational::one() - &self.0)
+        Self(kernel::complement(&ExactRational::from_ref(&self.0)).into_big())
     }
 
     /// The probability one, of the certain event.

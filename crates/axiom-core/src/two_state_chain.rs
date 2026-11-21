@@ -1,7 +1,9 @@
 use num_rational::BigRational;
-use num_traits::{Signed, Zero};
+use num_traits::Signed;
 use thiserror::Error;
 
+use crate::exact_rational::ExactRational;
+use crate::kernel;
 use crate::{AffineUpdate, Probability, TransitionMatrix, TransitionRow};
 
 /// The reason a two-state chain has no unique steady state.
@@ -76,7 +78,7 @@ impl TwoStateChain {
     /// which lies in `[-1, 1]`.
     #[must_use]
     pub fn contraction_factor(&self) -> BigRational {
-        self.leave_first.complement().value() - self.leave_second.value()
+        kernel::contraction_factor(&self.first(), &self.second()).into_big()
     }
 
     /// The unique steady-state probability of occupying the second state,
@@ -86,12 +88,16 @@ impl TwoStateChain {
     ///
     /// Returns [`TwoStateChainError::NoUniqueFixedPoint`] when `a + b = 0`.
     pub fn steady_state(&self) -> Result<Probability, TwoStateChainError> {
-        let total = self.leave_first.value() + self.leave_second.value();
-        if total.is_zero() {
-            return Err(TwoStateChainError::NoUniqueFixedPoint);
-        }
-        Probability::try_new(&(self.leave_first.value() / total))
-            .map_err(|_| TwoStateChainError::NoUniqueFixedPoint)
+        let steady = kernel::steady_state(&self.first(), &self.second())?;
+        Probability::try_new(&steady.into_big()).map_err(|_| TwoStateChainError::NoUniqueFixedPoint)
+    }
+
+    fn first(&self) -> ExactRational {
+        ExactRational::from_ref(self.leave_first.value())
+    }
+
+    fn second(&self) -> ExactRational {
+        ExactRational::from_ref(self.leave_second.value())
     }
 
     /// The least number of steps `n`, at most `limit`, after which the

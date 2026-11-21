@@ -2,6 +2,9 @@ use std::iter;
 
 use num_rational::BigRational;
 
+use crate::exact_rational::ExactRational;
+use crate::kernel;
+
 /// The update `x' = factor * x + offset`, applied once per step.
 ///
 /// For a two-state chain with exit probabilities `a` and `b`, `x` is the
@@ -38,7 +41,12 @@ impl AffineUpdate {
     /// Applies one step of the update to `value`.
     #[must_use]
     pub fn apply(&self, value: &BigRational) -> BigRational {
-        &self.factor * value + &self.offset
+        kernel::affine_apply(
+            &ExactRational::from_ref(&self.factor),
+            &ExactRational::from_ref(&self.offset),
+            &ExactRational::from_ref(value),
+        )
+        .into_big()
     }
 
     /// The exact sequence `x_0, x_1, x_2, ...` starting from `start`.

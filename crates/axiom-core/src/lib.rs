@@ -9,7 +9,9 @@
 //! certificate reader share.
 
 mod affine_update;
+mod exact_rational;
 mod hoeffding;
+mod kernel;
 mod probability;
 mod transition_matrix;
 mod transition_row;
