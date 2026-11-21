@@ -1,4 +1,4 @@
-.PHONY: ui-check lean-test rust-deny help hooks-install check fmt rust-fmt rust-lint rust-test rust-doc lean-build lean-check lean-cache lean-audit
+.PHONY: cli-demo ui-check lean-test rust-deny help hooks-install check fmt rust-fmt rust-lint rust-test rust-doc lean-build lean-check lean-cache lean-audit
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | sed 's/:.*## /\t/'
@@ -41,6 +41,10 @@ lean-test: ## Run the Lean checker tests against the shared fixtures
 
 lean-audit: lean-cache ## Fail unless every checker declaration uses only the standard axioms
 	./scripts/checkLeanAxioms.sh
+
+cli-demo: ## Write the golden certificate from links.axm and check it with the Lean checker
+	cargo run -q -p axiom-cli -- analyse fixtures/models/links.axm --cert target/links-mass.json
+	cargo run -q -p axiom-cli -- check target/links-mass.json
 
 ui-check: ## Install the web interface dependencies, typecheck it and build it
 	cd ui && bun install --frozen-lockfile && bun run typecheck && bun run build

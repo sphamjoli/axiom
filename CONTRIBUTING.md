@@ -49,6 +49,7 @@ The individual targets are listed below; `make help` prints the same list.
 | `make lean-check` | A fast text search for Lean constructs that skip or bypass proof checking: `sorry`, `admit`, `native_decide`, new `axiom` declarations and similar. |
 | `make lean-build` | Builds the Lean checker, treating warnings as errors. |
 | `make lean-test` | Runs the checker tests in `lean/AxiomCheckTest/` against the shared certificate fixtures. |
+| `make cli-demo` | Writes the certificate for `fixtures/models/links.axm` with `axiom analyse` and checks it with `axiom check`. |
 | `make ui-check` | Installs the web interface dependencies from `ui/bun.lock`, typechecks the interface with `vue-tsc` and builds it with Vite. |
 | `make lean-audit` | Asks the Lean kernel which axioms each checker declaration depends on, and fails unless the only ones are the three standard axioms of Lean's logic (`propext`, `Classical.choice` and `Quot.sound`). This catches bypasses that the text search misses. |
 
@@ -58,13 +59,26 @@ On some recent macOS versions the mathlib cache tool fails to start. `make lean-
 
 | Path | Contents |
 | --- | --- |
-| `Cargo.toml`, `crates/` | The Rust engine, a Cargo workspace. `crates/axiom-core` holds exact probabilities, transition rows, two-state chains and affine updates. `crates/axiom-cert` writes and reads certificates in the version 1 format. `crates/axiom-model` reads `.axm` model files: it parses them and runs the static checks of the modelling language. Each crate keeps its tests in its own `tests/` folder. |
-| `lean/` | The Lean 4 project for the `AxiomCheck` checker, pinned to Lean v4.19.0 and mathlib v4.19.0. `AxiomCheck/Json.lean` is the strict JSON reader and `AxiomCheck/Parse.lean` the certificate reader; their tests are in `lean/AxiomCheckTest/`. `lean/scripts/AxiomAudit.lean` implements the axiom audit. |
+| `Cargo.toml`, `crates/` | The Rust engine, a Cargo workspace. `crates/axiom-core` holds exact probabilities, transition rows, two-state chains and affine updates. `crates/axiom-cert` writes and reads certificates in the version 1 format. `crates/axiom-model` reads `.axm` model files: it parses them and runs the static checks of the modelling language. `crates/axiom-cli` builds the `axiom` command line program described below. Each crate keeps its tests in its own `tests/` folder. |
+| `lean/` | The Lean 4 project for the `AxiomCheck` checker, pinned to Lean v4.19.0 and mathlib v4.19.0. `AxiomCheck/Json.lean` is the strict JSON reader and `AxiomCheck/Parse.lean` the certificate reader; their tests are in `lean/AxiomCheckTest/`. `lean/scripts/AxiomAudit.lean` implements the axiom audit. `lean/AxiomCheckCli/Main.lean` is the entry point that `axiom check` runs. |
 | `fixtures/certificates/` | Certificates shared by the engine's and the checker's tests: a golden file both must read, and rejection fixtures both must reject. |
 | `fixtures/models/` | Model files with hand-computed expected results in sibling `.expected.json` files, and in `reject/` faulty models, each with the fault and its line and column. |
 | `ui/` | The web interface, written in Vue 3 and TypeScript and built with Vite and Tailwind CSS. It talks to the engine through the `Engine` interface in `ui/src/engine/types.ts`; until the engine is compiled to WebAssembly, `ui/src/engine/mock.ts` stands in for it. |
 | `scripts/` | The checks run by the Git hooks and by CI. |
 | `.github/` | CI workflows, the pull request template, issue templates and label definitions. |
+
+## Command line
+
+The `axiom` program is built from `crates/axiom-cli`. Run it with `cargo run -p axiom-cli --` followed by one of these commands:
+
+| Command | What it does |
+| --- | --- |
+| `axiom analyse <model.axm> --cert <out.json>` | Reads a model and, for a chain without parameters, writes a certificate with a `Mass` claim for every row. Retry models and chains with parameters are refused with an error, because no claim kind covers them yet. |
+| `axiom check <cert.json>` | Runs the Lean checker on a certificate and prints one line per claim, such as `claim 0 Mass row 0: accepted`, followed by the number of accepted claims and the time taken. |
+
+The exit status is 0 when the command succeeds and every claim is accepted, 1 when the checker rejects at least one claim, and 2 for a usage error, an unreadable or invalid input, an unsupported model, or a checker that could not be run.
+
+`axiom check` runs `lake env lean --run AxiomCheckCli/Main.lean <cert.json>` in the Lean project directory, which is `lean/` in the repository the program was built from unless the `AXIOM_LEAN_DIR` environment variable names another one. It therefore needs `lake` on `PATH` and a built checker (`cd lean && lake build`). The end-to-end tests of `axiom check` print a message and pass without checking anything when `lake` is not on `PATH`.
 
 ## Web interface
 
