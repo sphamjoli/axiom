@@ -59,7 +59,7 @@ export interface Claim {
 }
 
 export interface Certificate {
-  version: 1 | 2;
+  version: 1 | 2 | 3 | 4;
   claims: Claim[];
   // The certificate file exactly as `axiom analyse` writes it.
   json: string;
@@ -72,6 +72,42 @@ export interface Diagnostic {
   message: string;
 }
 
+// An interval with exact ends, each closed (included) or open (excluded).
+export interface Range {
+  lo: Fraction;
+  loClosed: boolean;
+  hi: Fraction;
+  hiClosed: boolean;
+}
+
+export interface ParameterRange {
+  name: string;
+  range: Range;
+}
+
+// Exact values for the two parameters.
+export interface Point {
+  a: Fraction;
+  b: Fraction;
+}
+
+// A two-state chain whose exit probabilities are its parameters a (first to
+// second) and b (second to first). The certificate claims it settles for
+// every point of the box; chain and convergence show one point of it.
+export interface Parametric {
+  states: [string, string];
+  a: ParameterRange;
+  b: ParameterRange;
+  // Fixed symbolic forms: "a/(a+b)" and "1 - a - b".
+  steadyState: string;
+  factor: string;
+  // The range of a + b and of lambda = 1 - a - b over the box.
+  sum: Range;
+  lambda: Range;
+  // The point shown, and the model text of that instance, for simulating.
+  point: Point & { source: string };
+}
+
 // A chain yields chain, certificate and, for a settling two-state chain,
 // convergence; a retry yields retry. Absent parts are null.
 export interface Analysis {
@@ -80,6 +116,7 @@ export interface Analysis {
   convergence: Convergence | null;
   retry: Retry | null;
   certificate: Certificate | null;
+  parametric: Parametric | null;
   // Set when the model is valid but the browser does not analyse it.
   notice: string | null;
 }
@@ -88,8 +125,18 @@ export type AnalyzeResult =
   | { ok: true; analysis: Analysis }
   | { ok: false; diagnostics: Diagnostic[] };
 
+// A point the engine refused: a stable code and a fixed message.
+export interface PointError {
+  code: string;
+  message: string;
+}
+
+export type AnalyzeAtResult = AnalyzeResult | { ok: false; error: PointError };
+
 export interface Engine {
   analyze(source: string): Promise<AnalyzeResult>;
+  // Analyses a parametric two-state chain at one point of its box.
+  analyzeAt(source: string, point: Point): Promise<AnalyzeAtResult>;
   simulate(source: string, request: SimulateRequest): Promise<SimulateResult>;
 }
 

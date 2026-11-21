@@ -1,4 +1,4 @@
-import type { Fraction } from "./engine/types";
+import type { Fraction, Range } from "./engine/types";
 
 // Exact fractions in the page: parsing, arithmetic and text. Every exact
 // value is a pair of decimal strings; floats come only from `approx`, for
@@ -56,6 +56,31 @@ export function within(a: Fraction, b: Fraction, epsilon: Fraction): boolean {
   const gap = BigInt(a.num) * BigInt(b.den) - BigInt(b.num) * BigInt(a.den);
   const size = gap < 0n ? -gap : gap;
   return size * BigInt(epsilon.den) <= BigInt(epsilon.num) * BigInt(a.den) * BigInt(b.den);
+}
+
+// The sign of a - b, decided exactly over the integers (denominators are
+// positive).
+export function compare(a: Fraction, b: Fraction): number {
+  const gap = BigInt(a.num) * BigInt(b.den) - BigInt(b.num) * BigInt(a.den);
+  return gap === 0n ? 0 : gap < 0n ? -1 : 1;
+}
+
+// Whether `value` lies in `range`, open ends excluded.
+export function inInterval(value: Fraction, range: Range): boolean {
+  const lo = compare(value, range.lo);
+  const hi = compare(value, range.hi);
+  return (range.loClosed ? lo >= 0 : lo > 0) && (range.hiClosed ? hi <= 0 : hi < 0);
+}
+
+// A signed fraction with a true minus sign, for labels: "−1", "1/4".
+export function signedText(value: Fraction): string {
+  const text = fractionText(value);
+  return text.startsWith("-") ? `−${text.slice(1)}` : text;
+}
+
+// An interval as written in a model: "]0, 1[" excludes both ends.
+export function rangeText(range: Range): string {
+  return `${range.loClosed ? "[" : "]"}${signedText(range.lo)}, ${signedText(range.hi)}${range.hiClosed ? "]" : "["}`;
 }
 
 // A fraction's value as a float, for plotting only.

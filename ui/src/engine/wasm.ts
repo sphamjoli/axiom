@@ -1,6 +1,6 @@
-import init, { analyse } from "./wasm/axiom_wasm.js";
+import init, { analyse, analyse_at } from "./wasm/axiom_wasm.js";
 import type { SimJob, SimReply } from "./simWorker";
-import type { AnalyzeResult, Engine, SimulateResult } from "./types";
+import type { AnalyzeAtResult, AnalyzeResult, Engine, SimulateResult } from "./types";
 
 // Loads the WebAssembly module once, on first use.
 let ready: Promise<unknown> | null = null;
@@ -47,6 +47,11 @@ export const wasmEngine: Engine = {
     ready ??= init();
     await ready;
     return JSON.parse(analyse(source)) as AnalyzeResult;
+  },
+  async analyzeAt(source, point) {
+    ready ??= init();
+    await ready;
+    return JSON.parse(analyse_at(source, JSON.stringify({ a: point.a, b: point.b }))) as AnalyzeAtResult;
   },
   simulate(source, request) {
     nextId += 1;
