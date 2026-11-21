@@ -5,7 +5,7 @@ use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 
-use axiom_cert::{Certificate, Estimate, Interval, Model, Quantity};
+use axiom_cert::{Certificate, Estimate, FAILURE_ATTEMPTS, Interval, Model, Quantity};
 use axiom_core::Probability;
 use axiom_model::{Chain, CheckedModel, MAX_INPUT_BYTES, Parameter};
 
@@ -32,10 +32,6 @@ impl fmt::Display for Summary {
         )
     }
 }
-
-/// The attempt count of the `failure_after` part of a `Termination` claim,
-/// and the attempts each sampled retry may make for a `success` estimate.
-const FAILURE_ATTEMPTS: u64 = 20;
 
 /// The steps of each sampled trajectory for a `steady-state` estimate. The
 /// trajectories start in the first state; after this many steps the links

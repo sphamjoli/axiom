@@ -19,7 +19,7 @@
 //! assert!(json.contains("\"expectedAttempts\":{\"num\":\"10\",\"den\":\"3\"}"));
 //! ```
 
-use axiom_cert::{Certificate, Claim, Model};
+use axiom_cert::{Certificate, Claim, FAILURE_ATTEMPTS, FailureAfter, Model};
 use axiom_core::{Probability, TransitionMatrix, TwoStateChain};
 use axiom_model::{CheckedModel, ModelError};
 use num_bigint::BigInt;
@@ -317,6 +317,9 @@ fn analyse_model(model: CheckedModel) -> Analysis {
         CheckedModel::Retry(retry) => match retry.probability {
             Some(success) => Analysis {
                 retry: Some(retry_view(&success)),
+                certificate: Certificate::termination(success.clone(), FAILURE_ATTEMPTS)
+                    .ok()
+                    .and_then(|certificate| certificate_view(&[], &certificate)),
                 notice: None,
                 ..notice(retry.name, String::new())
             },
@@ -481,65 +484,143 @@ fn certificate_view(states: &[String], certificate: &Certificate) -> Option<Cert
         .claims()
         .iter()
         .enumerate()
-        .map(|(index, claim)| match claim {
-            Claim::Mass { row } => ClaimView {
-                id: format!("mass-{row}"),
-                statement: format!(
-                    "Row {} sums to 1",
-                    states.get(*row).map_or("?", String::as_str)
-                ),
-                status: UNCHECKED,
-                detail: format!("Every entry is a probability. {NOT_CHECKED}"),
-            },
-            Claim::FixedPoint { value } => ClaimView {
-                id: String::from("fixed-point"),
-                statement: format!(
-                    "P({second}) = {} is a fixed point of the update",
-                    fraction_text(value.value())
-                ),
-                status: UNCHECKED,
-                detail: format!("The steady state of the chain. {NOT_CHECKED}"),
-            },
-            Claim::Contraction { factor } => ClaimView {
-                id: String::from("contraction"),
-                statement: format!(
-                    "The update contracts with factor {}",
-                    fraction_text(factor)
-                ),
-                status: UNCHECKED,
-                detail: format!(
-                    "Its absolute value is below 1, so every start converges to the fixed point. {NOT_CHECKED}"
-                ),
-            },
-            Claim::ParametricContraction => {
-                let (a, b) = match certificate.model() {
-                    Model::Parametric { a, b } => {
-                        (parametric::interval_text(a), parametric::interval_text(b))
-                    }
-                    _ => (String::from("?"), String::from("?")),
-                };
-                ClaimView {
-                    id: String::from("parametric-contraction"),
-                    statement: format!(
-                        "For every a in {a} and b in {b}, P({second}) settles to a/(a+b) and |1 - a - b| < 1"
-                    ),
-                    status: UNCHECKED,
-                    detail: format!(
-                        "One claim for the whole range, not for sampled values. {NOT_CHECKED}"
-                    ),
-                }
-            }
-            _ => ClaimView {
-                id: format!("claim-{index}"),
-                statement: String::from("A claim of a kind this page cannot show"),
-                status: UNCHECKED,
-                detail: String::from(NOT_CHECKED),
-            },
-        })
+        .map(|(index, claim)| claim_view(index, claim, certificate, states, second))
         .collect();
     Some(CertificateView {
         version: certificate.version(),
         claims,
         json,
     })
+}
+
+/// How the page states one claim of a certificate.
+fn claim_view(
+    index: usize,
+    claim: &Claim,
+    certificate: &Certificate,
+    states: &[String],
+    second: &str,
+) -> ClaimView {
+    match claim {
+        Claim::Mass { row } => ClaimView {
+            id: format!("mass-{row}"),
+            statement: format!(
+                "Row {} sums to 1",
+                states.get(*row).map_or("?", String::as_str)
+            ),
+            status: UNCHECKED,
+            detail: format!("Every entry is a probability. {NOT_CHECKED}"),
+        },
+        Claim::FixedPoint { value } => ClaimView {
+            id: String::from("fixed-point"),
+            statement: format!(
+                "P({second}) = {} is a fixed point of the update",
+                fraction_text(value.value())
+            ),
+            status: UNCHECKED,
+            detail: format!("The steady state of the chain. {NOT_CHECKED}"),
+        },
+        Claim::Contraction { factor } => ClaimView {
+            id: String::from("contraction"),
+            statement: format!("The update contracts with factor {}", fraction_text(factor)),
+            status: UNCHECKED,
+            detail: format!(
+                "Its absolute value is below 1, so every start converges to the fixed point. {NOT_CHECKED}"
+            ),
+        },
+        Claim::ParametricContraction => {
+            let (a, b) = match certificate.model() {
+                Model::Parametric { a, b } => {
+                    (parametric::interval_text(a), parametric::interval_text(b))
+                }
+                _ => (String::from("?"), String::from("?")),
+            };
+            ClaimView {
+                id: String::from("parametric-contraction"),
+                statement: format!(
+                    "For every a in {a} and b in {b}, P({second}) settles to a/(a+b) and |1 - a - b| < 1"
+                ),
+                status: UNCHECKED,
+                detail: format!(
+                    "One claim for the whole range, not for sampled values. {NOT_CHECKED}"
+                ),
+            }
+        }
+        Claim::ConvergenceBound {
+            start,
+            steps,
+            tolerance,
+        } => ClaimView {
+            id: String::from("convergence-bound"),
+            statement: format!(
+                "From P({second}) = {}, every step from {steps} on is within {} of the fixed point",
+                fraction_text(start.value()),
+                fraction_text(tolerance)
+            ),
+            status: UNCHECKED,
+            detail: format!(
+                "It holds for every later step, not only the ones plotted. {NOT_CHECKED}"
+            ),
+        },
+        Claim::Termination {
+            probability,
+            expected_attempts,
+            failure_after,
+        } => ClaimView {
+            id: String::from("termination"),
+            statement: termination_statement(
+                probability,
+                expected_attempts.as_ref(),
+                failure_after.as_ref(),
+            ),
+            status: UNCHECKED,
+            detail: format!("Exact values from the retry equation. {NOT_CHECKED}"),
+        },
+        Claim::Estimate(estimate) => ClaimView {
+            id: String::from("estimate"),
+            statement: format!(
+                "Estimate {} from {} samples, within {} with probability at least 1 - {}",
+                fraction_text(estimate.value.value()),
+                estimate.samples,
+                fraction_text(&estimate.epsilon),
+                fraction_text(&estimate.delta)
+            ),
+            status: UNCHECKED,
+            detail: format!(
+                "An estimate from sampling, never a proof: the checker verifies only that the sample count is enough. {NOT_CHECKED}"
+            ),
+        },
+        _ => ClaimView {
+            id: format!("claim-{index}"),
+            statement: String::from("A claim of a kind this page cannot show"),
+            status: UNCHECKED,
+            detail: String::from(NOT_CHECKED),
+        },
+    }
+}
+
+/// A `Termination` claim in plain words, with its optional parts.
+fn termination_statement(
+    probability: &Probability,
+    expected_attempts: Option<&BigRational>,
+    failure_after: Option<&FailureAfter>,
+) -> String {
+    let eventual = format!(
+        "The retry eventually succeeds with probability {}",
+        fraction_text(probability.value())
+    );
+    let average = expected_attempts
+        .map(|expected| format!("after {} attempts on average", fraction_text(expected)));
+    let failing = failure_after.map(|failure| {
+        format!(
+            "and all of the first {} attempts fail with probability {}",
+            failure.attempts,
+            fraction_text(failure.probability.value())
+        )
+    });
+    std::iter::once(eventual)
+        .chain(average)
+        .chain(failing)
+        .collect::<Vec<_>>()
+        .join(", ")
 }

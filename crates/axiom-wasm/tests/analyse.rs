@@ -86,6 +86,34 @@ fn links_certificate_is_the_strongest_one_and_unchecked() -> Result<(), TestErro
     )
 }
 
+/// Every claim the engine writes has a statement the page can show: none
+/// falls through to the generic text, for chains and for retries.
+#[test]
+fn every_claim_kind_has_its_own_statement() -> Result<(), TestError> {
+    for (name, kind) in [
+        ("links.axm", "convergence-bound"),
+        ("retry.axm", "termination"),
+    ] {
+        let (_, result) = analyse_fixture(name)?;
+        let claims = result["analysis"]["certificate"]["claims"]
+            .as_array()
+            .ok_or_else(|| TestError::Failed(format!("{name}: claims")))?;
+        ensure(
+            claims.iter().any(|claim| claim["id"] == kind),
+            &format!("{name}: {kind} claim shown"),
+        )?;
+        ensure(
+            claims.iter().all(|claim| {
+                !claim["id"]
+                    .as_str()
+                    .is_some_and(|id| id.starts_with("claim-"))
+            }),
+            &format!("{name}: no claim falls through"),
+        )?;
+    }
+    Ok(())
+}
+
 #[test]
 fn retry_fills_the_retry_section_only() -> Result<(), TestError> {
     let (_, result) = analyse_fixture("retry.axm")?;

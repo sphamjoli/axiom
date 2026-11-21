@@ -33,6 +33,11 @@ pub const MAX_STATES: usize = 16;
 /// is quadratic in the count, which is why the limit is not higher.
 pub const MAX_COUNT: u64 = 1_000;
 
+/// The attempt count the engine uses for the `failure_after` part of a
+/// `Termination` claim: the probability that each of the first 20 attempts
+/// fails, `(1 - p)^20`.
+pub const FAILURE_ATTEMPTS: u64 = 20;
+
 /// The largest sample count of an `Estimate` claim. It bounds the work of
 /// reproducing the estimate from its seed; checking the count costs the
 /// same for every count, because the Hoeffding bound clamps its argument.
