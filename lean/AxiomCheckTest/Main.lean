@@ -6,8 +6,8 @@ import AxiomCheck
 Runs the strict JSON reader and the certificate reader against the shared
 fixtures in `fixtures/certificates/` and against reader-specific cases. Every
 rejection fixture must be rejected, except the one whose fault is arithmetic:
-the reader accepts it structurally and the claim check, still to be written,
-must reject it. Exits with a non-zero status if any case fails.
+the reader accepts it structurally and the claim check
+rejects it. Exits with a non-zero status if any case fails.
 -/
 
 open AxiomCheck
@@ -128,6 +128,35 @@ def acceptanceCases : IO (List Outcome) := do
     let text ← IO.FS.readFile (fixtureDirectory / "accept" / name)
     pure (expect s!"accepts {name}" (certificateAccepts text) "rejected an acceptance fixture")
 
+/-- Whether `text` parses and every claim checks. -/
+def checks (text : String) : Option Bool :=
+  match Parse.certificate text with
+  | .ok certificate => some (Check.check certificate)
+  | .error _ => none
+
+/-- The golden certificate with row 0 replaced by `row`. -/
+def goldenWithRow0 (row : List Fraction) : Certificate :=
+  ⟨[row, [⟨3, 10⟩, ⟨7, 10⟩]], [.mass 0, .mass 1]⟩
+
+/-- Cases for the claim checker. -/
+def checkCases : IO (List Outcome) := do
+  let golden ← IO.FS.readFile (fixtureDirectory / "links-mass.json")
+  let arithmetic ← IO.FS.readFile (fixtureDirectory / "reject" / "does-not-sum-to-one.json")
+  pure
+    [ expect "checks the golden file" (checks golden == some true) "golden file did not check"
+    , expect "parses but rejects does-not-sum-to-one.json" (checks arithmetic == some false)
+        "arithmetic fixture was not parsed and rejected"
+    , expect "rejects a row summing to 999/1000"
+        (!Check.check (goldenWithRow0 [⟨899, 1000⟩, ⟨1, 10⟩])) "accepted 999/1000"
+    , expect "rejects a row summing to 1001/1000"
+        (!Check.check (goldenWithRow0 [⟨901, 1000⟩, ⟨1, 10⟩])) "accepted 1001/1000"
+    , expect "rejects an entry above one"
+        (!Check.check (goldenWithRow0 [⟨3, 2⟩, ⟨0, 1⟩])) "accepted 3/2"
+    , expect "rejects a claim on a missing row"
+        (!Check.check ⟨[[⟨1, 1⟩]], [.mass 1]⟩) "accepted a missing row"
+    , expect "accepts the unmutated golden model"
+        (Check.check (goldenWithRow0 [⟨9, 10⟩, ⟨1, 10⟩])) "rejected the golden model" ]
+
 /-- Cases for size and shape limits that are impractical as fixture files. -/
 def limitCases : List Outcome :=
   let half := "{\"num\":\"1\",\"den\":\"2\"}"
@@ -164,7 +193,7 @@ open AxiomCheckTest in
 /-- Runs every case, prints failures, and returns 1 if any failed. -/
 def main : IO UInt32 := do
   let outcomes :=
-    readerCases ++ (← goldenCases) ++ (← acceptanceCases) ++ (← rejectionCases) ++ limitCases
+    readerCases ++ (← goldenCases) ++ (← checkCases) ++ (← acceptanceCases) ++ (← rejectionCases) ++ limitCases
   let failures := outcomes.filterMap fun outcome => outcome.failure.map (outcome.name, ·)
   for (name, why) in failures do
     IO.eprintln s!"FAIL {name}: {why}"
