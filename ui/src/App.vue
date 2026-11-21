@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, shallowRef, watch, watchEffect } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch, watchEffect } from "vue";
 import CertificatePanel from "./components/CertificatePanel.vue";
 import ConvergencePlot from "./components/ConvergencePlot.vue";
 import Frac from "./components/Frac.vue";
@@ -75,11 +75,28 @@ function load(text: string): void {
   source.value = text;
 }
 
+// Brings an element into view: a short glide that shows where the page
+// went, or an instant jump when reduced motion is asked for.
+function reveal(id: string): void {
+  const element = document.getElementById(id);
+  if (!element) return;
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  element.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
+}
+
 // Loading from the guide also brings the editor into view.
 function loadFromGuide(text: string): void {
   load(text);
-  document.getElementById("model-source")?.focus();
+  reveal("model-source");
+  document.getElementById("model-source")?.focus({ preventScroll: true });
 }
+
+// Opening the guide brings it into view.
+watch(guideOpen, async (open) => {
+  if (!open) return;
+  await nextTick();
+  reveal("guide");
+});
 
 const dark = ref(window.matchMedia("(prefers-color-scheme: dark)").matches);
 watchEffect(() => document.documentElement.classList.toggle("dark", dark.value));

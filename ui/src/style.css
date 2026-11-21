@@ -123,3 +123,58 @@
 .is-stale {
   opacity: 0.45;
 }
+
+/* Scrollbars use the page tokens instead of the platform defaults: a thin
+   rule-coloured thumb on the surface it scrolls, darker on hover. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--rule);
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--ink-muted);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Scrolling. The gutter is reserved so content never shifts when a
+   scrollbar appears; in-page jumps glide unless reduced motion is asked
+   for; a panel reached by a jump stops short of the top edge; and inner
+   scroll areas keep their scroll to themselves at their ends. */
+html {
+  scrollbar-gutter: stable;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+[id] {
+  scroll-margin-top: 1.5rem;
+}
+
+textarea,
+pre,
+.overflow-x-auto {
+  overscroll-behavior: contain;
+}
