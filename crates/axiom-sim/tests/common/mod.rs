@@ -27,6 +27,15 @@ pub enum TestError {
     /// The model has a different form than the test expects.
     #[error("model has an unexpected form")]
     Form,
+    /// A shared fixture file could not be read.
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+    /// A shared fixture file is not valid JSON.
+    #[error(transparent)]
+    Json(#[from] serde_json::Error),
+    /// A shared fixture has an unexpected shape.
+    #[error("fixture field {0} is missing or malformed")]
+    Fixture(String),
     /// A result differs from the expected one.
     #[error("{0}")]
     Mismatch(String),

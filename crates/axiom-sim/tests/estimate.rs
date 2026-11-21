@@ -1,114 +1,201 @@
 //! Hoeffding sample counts and estimates.
+//!
+//! The exact numbers live in `fixtures/estimate/cases.json`, which the Lean
+//! checker's `AxiomCheckTest/Estimate.lean` reads too, so the engine and the
+//! checker must agree on every case. The expected bounds there are exact
+//! rationals computed independently of both, so rounding a bound up instead
+//! of down, or dropping the clamp, changes a value and fails a case.
 
 mod common;
 
+use std::path::PathBuf;
+
 use axiom_sim::{
-    Certainty, Estimate, SimError, chain_matrix, exp_lower_bound, hoeffding_holds,
-    required_samples, sample_chain,
+    Certainty, Estimate, SimError, exp_lower_bound, hoeffding_holds, required_samples,
 };
-use common::{TestError, ensure, links, ratio};
+use common::{TestError, ensure, ratio};
+use num_bigint::BigInt;
 use num_rational::BigRational;
-use num_traits::{One, Signed, Zero};
+use num_traits::{One, Zero};
+use serde_json::Value;
 
-#[test]
-fn exp_lower_bound_is_one_at_zero() -> Result<(), TestError> {
-    ensure(
-        exp_lower_bound(&BigRational::zero()) == BigRational::one(),
-        "exp(0) bound is 1",
-    )
+/// The shared estimate cases.
+fn cases() -> Result<Value, TestError> {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/estimate/cases.json");
+    Ok(serde_json::from_str(&std::fs::read_to_string(path)?)?)
+}
+
+/// The list `name` of the shared cases.
+fn list<'a>(cases: &'a Value, name: &str) -> Result<&'a Vec<Value>, TestError> {
+    cases
+        .get(name)
+        .and_then(Value::as_array)
+        .ok_or_else(|| TestError::Fixture(name.to_owned()))
+}
+
+/// The decimal string `field` of `case`.
+fn text<'a>(case: &'a Value, field: &str) -> Result<&'a str, TestError> {
+    case.get(field)
+        .and_then(Value::as_str)
+        .ok_or_else(|| TestError::Fixture(field.to_owned()))
+}
+
+/// The integer written as the decimal string `field` of `case`.
+fn integer(case: &Value, field: &str) -> Result<u64, TestError> {
+    text(case, field)?
+        .parse()
+        .map_err(|_| TestError::Fixture(field.to_owned()))
+}
+
+/// The fraction `{"num", "den"}` in `field` of `case`.
+fn fraction(case: &Value, field: &str) -> Result<BigRational, TestError> {
+    let object = case
+        .get(field)
+        .ok_or_else(|| TestError::Fixture(field.to_owned()))?;
+    let part = |name: &str| -> Result<BigInt, TestError> {
+        text(object, name)?
+            .parse()
+            .map_err(|_| TestError::Fixture(format!("{field}.{name}")))
+    };
+    let den = part("den")?;
+    if den.is_zero() {
+        return Err(TestError::Fixture(format!("{field}.den")));
+    }
+    Ok(BigRational::new(part("num")?, den))
 }
 
 #[test]
-fn exp_lower_bound_is_tight_and_below_e() -> Result<(), TestError> {
-    let bound = exp_lower_bound(&BigRational::one());
-    // e = 2.718281828459045...
-    ensure(
-        bound > ratio(2_718_281_828, 1_000_000_000),
-        "bound is within 10^-9 of e",
+fn exp_lower_bound_equals_the_exact_floor_rounded_value() -> Result<(), TestError> {
+    let all = cases()?;
+    let exp = list(&all, "exp")?;
+    ensure(!exp.is_empty(), "the fixture has exp cases")?;
+    for case in exp {
+        let x = fraction(case, "x")?;
+        let bound = exp_lower_bound(&x);
+        ensure(
+            bound == fraction(case, "bound")?,
+            format!("exp bound at {x} is {bound}"),
+        )?;
+    }
+    Ok(())
+}
+
+#[test]
+fn required_samples_is_the_least_accepted_count() -> Result<(), TestError> {
+    let all = cases()?;
+    for case in list(&all, "required")? {
+        let epsilon = fraction(case, "epsilon")?;
+        let delta = fraction(case, "delta")?;
+        let expected = integer(case, "samples")?;
+        let samples = required_samples(&epsilon, &delta)?;
+        ensure(samples == expected, format!("required {samples}"))?;
+        ensure(
+            hoeffding_holds(expected, &epsilon, &delta),
+            format!("{expected} meets the bound"),
+        )?;
+        ensure(
+            !hoeffding_holds(expected - 1, &epsilon, &delta),
+            format!("{} does not", expected - 1),
+        )?;
+    }
+    Ok(())
+}
+
+#[test]
+fn hoeffding_verdicts_match_the_fixture() -> Result<(), TestError> {
+    let all = cases()?;
+    for case in list(&all, "hoeffding")? {
+        let n = integer(case, "n")?;
+        let accept = match text(case, "verdict")? {
+            "accept" => true,
+            "reject" => false,
+            _ => return Err(TestError::Fixture("verdict".to_owned())),
+        };
+        ensure(
+            hoeffding_holds(n, &fraction(case, "epsilon")?, &fraction(case, "delta")?) == accept,
+            format!("verdict for n = {n}"),
+        )?;
+    }
+    Ok(())
+}
+
+#[test]
+fn an_estimate_is_the_exact_mean_and_is_estimated() -> Result<(), TestError> {
+    let all = cases()?;
+    let case = list(&all, "required")?
+        .first()
+        .ok_or_else(|| TestError::Fixture("required".to_owned()))?;
+    let samples = integer(case, "samples")?;
+    let estimate = Estimate::from_hits(
+        9_501,
+        samples,
+        fraction(case, "epsilon")?,
+        fraction(case, "delta")?,
     )?;
     ensure(
-        bound < ratio(2_718_281_829, 1_000_000_000),
-        "bound is below e",
-    )
-}
-
-#[test]
-fn exp_lower_bound_is_below_exp_of_large_arguments() -> Result<(), TestError> {
-    // exp(10) = 22026.4657948...
-    let bound = exp_lower_bound(&ratio(10, 1));
-    ensure(bound > ratio(220_264, 10), "bound is close to exp(10)")?;
-    ensure(bound < ratio(2_202_647, 100), "bound is below exp(10)")
-}
-
-/// `ln(2000) / (2 · 10^-4) = 38004.51...`, so 38005 samples are needed for
-/// `ε = 1/100` and `δ = 1/1000`, and the rational bound finds exactly that.
-#[test]
-fn d_star_within_one_hundredth_at_confidence_0_999_needs_38005_samples() -> Result<(), TestError> {
-    let epsilon = ratio(1, 100);
-    let delta = ratio(1, 1000);
-    let samples = required_samples(&epsilon, &delta)?;
-    ensure(samples == 38_005, format!("required {samples}"))?;
-    ensure(
-        hoeffding_holds(38_005, &epsilon, &delta),
-        "38005 meets the bound",
+        estimate.value == BigRational::new(BigInt::from(9_501), BigInt::from(samples)),
+        "the value is hits / samples",
     )?;
-    ensure(!hoeffding_holds(38_004, &epsilon, &delta), "38004 does not")
-}
-
-/// `ln(2 · 10^9) / (2 · (1/50)^2) = 26770.52...`, the Lean tests' second case.
-#[test]
-fn one_fiftieth_at_one_in_a_billion_needs_26771_samples() -> Result<(), TestError> {
-    let samples = required_samples(&ratio(1, 50), &ratio(1, 1_000_000_000))?;
-    ensure(samples == 26_771, format!("required {samples}"))
-}
-
-#[test]
-fn estimate_of_d_star_is_within_tolerance() -> Result<(), TestError> {
-    let epsilon = ratio(1, 100);
-    let delta = ratio(1, 1000);
-    let samples = required_samples(&epsilon, &delta)?;
-    let chain = links()?;
-    let count = usize::try_from(samples).map_err(|_| TestError::Form)?;
-    let run = sample_chain(chain_matrix(&chain)?, 0, 60, count, 1)?;
-    let estimate = Estimate::from_hits(run.count(1), run.samples(), epsilon.clone(), delta)?;
-    ensure(estimate.samples == 38_005, "the estimate records n")?;
+    ensure(estimate.samples == samples, "the estimate records n")?;
     ensure(
         estimate.certainty() == Certainty::Estimated,
         "estimates are Estimated",
-    )?;
-    let error = (&estimate.value - ratio(1, 4)).abs();
-    ensure(error < epsilon, format!("estimate misses d* by {error}"))
+    )
 }
 
 #[test]
-fn too_few_samples_are_refused() -> Result<(), TestError> {
-    let result = Estimate::from_hits(9_501, 38_004, ratio(1, 100), ratio(1, 1000));
+fn one_sample_below_the_requirement_is_refused() -> Result<(), TestError> {
+    let all = cases()?;
+    let case = list(&all, "required")?
+        .first()
+        .ok_or_else(|| TestError::Fixture("required".to_owned()))?;
+    let actual = integer(case, "samples")? - 1;
+    let result = Estimate::from_hits(
+        0,
+        actual,
+        fraction(case, "epsilon")?,
+        fraction(case, "delta")?,
+    );
     ensure(
-        result == Err(SimError::TooFewSamples { actual: 38_004 }),
-        "38004 samples are too few",
+        result == Err(SimError::TooFewSamples { actual }),
+        format!("{actual} samples are too few"),
     )
 }
 
 #[test]
 fn invalid_parameters_are_refused() -> Result<(), TestError> {
+    let half = ratio(1, 2);
+    for bad in [BigRational::zero(), BigRational::one(), ratio(-1, 2)] {
+        ensure(
+            required_samples(&bad, &half) == Err(SimError::InvalidEpsilon),
+            format!("epsilon {bad}"),
+        )?;
+        ensure(
+            required_samples(&half, &bad) == Err(SimError::InvalidDelta),
+            format!("delta {bad}"),
+        )?;
+        ensure(
+            Estimate::from_hits(1, 1, bad.clone(), half.clone()) == Err(SimError::InvalidEpsilon),
+            format!("estimate epsilon {bad}"),
+        )?;
+        ensure(
+            Estimate::from_hits(1, 1, half.clone(), bad.clone()) == Err(SimError::InvalidDelta),
+            format!("estimate delta {bad}"),
+        )?;
+    }
     ensure(
-        required_samples(&BigRational::zero(), &ratio(1, 2)) == Err(SimError::InvalidEpsilon),
-        "epsilon zero",
-    )?;
-    ensure(
-        required_samples(&ratio(1, 2), &BigRational::one()) == Err(SimError::InvalidDelta),
-        "delta one",
-    )?;
-    ensure(
-        Estimate::from_hits(3, 2, ratio(1, 2), ratio(1, 2)) == Err(SimError::HitsExceedSamples),
+        Estimate::from_hits(3, 2, half.clone(), half) == Err(SimError::HitsExceedSamples),
         "hits above samples",
     )
 }
 
+/// `ε = 10^-12` needs about `ln 4 / (2 · 10^-24) ≈ 7 · 10^23` samples, beyond
+/// the `2^62` search limit.
 #[test]
-fn hoeffding_rejects_non_positive_delta() -> Result<(), TestError> {
+fn a_tiny_epsilon_is_unreachable() -> Result<(), TestError> {
     ensure(
-        !hoeffding_holds(1_000_000, &ratio(1, 2), &BigRational::zero()),
-        "delta zero",
+        required_samples(&ratio(1, 1_000_000_000_000), &ratio(1, 2))
+            == Err(SimError::SamplesUnreachable),
+        "epsilon 10^-12 is unreachable",
     )
 }
