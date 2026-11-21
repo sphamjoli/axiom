@@ -41,7 +41,7 @@ const FAILURE_ATTEMPTS: u64 = 20;
 /// The steps of each sampled trajectory for a `steady-state` estimate. The
 /// trajectories start in the first state; after this many steps the links
 /// model is within `0.6^64 < 10^-14` of its steady state.
-const STEADY_STATE_STEPS: usize = 64;
+pub(crate) const STEADY_STATE_STEPS: usize = 64;
 
 /// Reads the model at `model` and writes a certificate to `cert`: for a
 /// chain, a `Mass` claim for every row, plus `FixedPoint`, `Contraction` and
@@ -118,9 +118,8 @@ pub fn run(
 /// error when the sample count is above the limit or the chain does not
 /// have two states.
 fn estimated(certificate: Certificate, request: &EstimateRequest) -> Result<Certificate, CliError> {
-    let samples = axiom_sim::required_samples(&request.epsilon, &request.delta)?;
+    let samples = sample_count(&certificate, request)?;
     let index = certificate.claims().len();
-    Estimate::check_samples(index, samples)?;
     let count = usize::try_from(samples).map_err(|_| {
         CliError::Certificate(axiom_cert::CertificateError::SamplesOutOfRange {
             claim: index,
@@ -146,6 +145,42 @@ fn estimated(certificate: Certificate, request: &EstimateRequest) -> Result<Cert
         }
         _ => return Err(CliError::Simulation(axiom_sim::SimError::Parametric)),
     };
+    with_sampled_estimate(certificate, quantity, hits, samples, request)
+}
+
+/// The least sample count that meets Hoeffding's bound for the request,
+/// checked against the format's limit for the estimate that would be
+/// appended to `certificate`, before any sampling.
+///
+/// # Errors
+///
+/// Returns the simulation error when `epsilon` or `delta` is not strictly
+/// between zero and one, and the certificate error when the count is above
+/// the limit.
+pub(crate) fn sample_count(
+    certificate: &Certificate,
+    request: &EstimateRequest,
+) -> Result<u64, CliError> {
+    let samples = axiom_sim::required_samples(&request.epsilon, &request.delta)?;
+    Estimate::check_samples(certificate.claims().len(), samples)?;
+    Ok(samples)
+}
+
+/// `certificate` with the `Estimate` claim of `hits` successes out of
+/// `samples` samples drawn with the request's seed appended.
+///
+/// # Errors
+///
+/// Returns the simulation error when the count does not meet the bound or
+/// `hits` exceeds it, and the certificate error when the reader would
+/// refuse the claim.
+pub(crate) fn with_sampled_estimate(
+    certificate: Certificate,
+    quantity: Quantity,
+    hits: u64,
+    samples: u64,
+    request: &EstimateRequest,
+) -> Result<Certificate, CliError> {
     let mean = axiom_sim::Estimate::from_hits(
         hits,
         samples,
@@ -216,7 +251,7 @@ fn interval(parameter: &Parameter) -> Option<Interval> {
 
 /// Reads a model file, refusing files larger than the model size limit
 /// without reading more than one byte past it.
-fn read_model(path: &Path) -> Result<String, CliError> {
+pub(crate) fn read_model(path: &Path) -> Result<String, CliError> {
     let io_error = |error: std::io::Error| CliError::ReadFailed {
         file: FileRole::Model,
         failure: IoFailure::from(&error),

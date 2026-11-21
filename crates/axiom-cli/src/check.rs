@@ -107,6 +107,17 @@ impl Report {
             .all(|verdict| verdict.accepted.is_some())
     }
 
+    /// Whether the checker accepted, as proven, a claim of kind `kind`, such
+    /// as `FixedPoint`. The certainty is the one [`parse_output`] matched
+    /// against the claim kind, never the checker's word alone.
+    #[must_use]
+    pub fn proven(&self, kind: &str) -> bool {
+        self.verdicts.iter().any(|verdict| {
+            verdict.accepted == Some(Certainty::Proven)
+                && verdict.claim.split(' ').nth(2) == Some(kind)
+        })
+    }
+
     /// The number of claims the checker gave a verdict on.
     #[must_use]
     pub fn claims(&self) -> usize {

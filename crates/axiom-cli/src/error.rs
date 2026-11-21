@@ -11,6 +11,7 @@ use std::fmt;
 use std::io;
 
 use axiom_cert::CertificateError;
+use axiom_infer::InferError;
 use axiom_model::ModelError;
 use axiom_sim::SimError;
 use thiserror::Error;
@@ -219,6 +220,13 @@ pub enum CliError {
     /// sample count that meets the confidence.
     #[error(transparent)]
     Simulation(#[from] SimError),
+    /// The black box could not be run or its candidates proposed.
+    #[error(transparent)]
+    Inference(#[from] InferError),
+    /// `explore` was given a model other than a two-state chain without
+    /// parameters, the only model its candidates cover.
+    #[error("explore needs a two-state chain without parameters")]
+    ExploreUnsupported,
     /// `lake` could not be started or waited for.
     #[error("cannot run the Lean checker with lake")]
     CheckerNotStarted,
@@ -257,6 +265,8 @@ impl CliError {
             Self::ParametricRetry => "parametric-retry",
             Self::Certificate(error) => error.code(),
             Self::Simulation(error) => error.code(),
+            Self::Inference(error) => error.code(),
+            Self::ExploreUnsupported => "explore-unsupported",
             Self::CheckerNotStarted => "checker-not-started",
             Self::CheckerTimeout { .. } => "checker-timeout",
             Self::CheckerRefused(reason) => reason.code(),
@@ -277,7 +287,9 @@ impl CliError {
             | Self::ParametricChain
             | Self::ParametricRetry
             | Self::Certificate(_)
-            | Self::Simulation(_) => Outcome::Refused,
+            | Self::Simulation(_)
+            | Self::Inference(_)
+            | Self::ExploreUnsupported => Outcome::Refused,
             Self::CheckerRefused(reason) => reason.outcome(),
             Self::ReadFailed { .. }
             | Self::WriteFailed { .. }

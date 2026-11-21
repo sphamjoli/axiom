@@ -12,6 +12,7 @@ use axiom_cert::CertificateError;
 use axiom_cli::checker_rule::CheckerRule;
 use axiom_cli::error::{CheckerReason, CliError, FileRole, IoFailure};
 use axiom_cli::outcome::Outcome;
+use axiom_infer::InferError;
 use axiom_model::{ModelError, Position};
 use axiom_sim::SimError;
 use common::{TestError, ensure};
@@ -35,6 +36,7 @@ fn every_error() -> Vec<CliError> {
         CliError::ModelNotUtf8,
         CliError::ParametricChain,
         CliError::ParametricRetry,
+        CliError::ExploreUnsupported,
         CliError::CheckerNotStarted,
         CliError::CheckerTimeout { seconds: 5 },
     ]);
@@ -89,6 +91,10 @@ fn expected_reports() -> Vec<(String, Outcome)> {
         ),
         (
             "axiom: parametric-retry: parametric retries are not yet supported: no claim kind covers them",
+            Refused,
+        ),
+        (
+            "axiom: explore-unsupported: explore needs a two-state chain without parameters",
             Refused,
         ),
         (
@@ -151,15 +157,15 @@ fn every_error_has_a_stable_code_fixed_message_and_outcome() -> Result<(), TestE
         .collect();
     ensure(found == expected_reports(), format!("{found:#?}"))?;
     let codes: BTreeSet<&str> = errors.iter().map(CliError::code).collect();
-    // One code per variant: the six checker reasons and eleven others.
+    // One code per variant: the six checker reasons and twelve others.
     ensure(
-        codes.len() == 17,
+        codes.len() == 18,
         format!("codes are not distinct: {codes:?}"),
     )
 }
 
 #[test]
-fn model_certificate_and_simulation_errors_keep_their_own_code_and_are_refusals()
+fn model_certificate_simulation_and_inference_errors_keep_their_own_code_and_are_refusals()
 -> Result<(), TestError> {
     let model = CliError::from(ModelError::MissingRow {
         at: Position {
@@ -183,6 +189,13 @@ fn model_certificate_and_simulation_errors_keep_their_own_code_and_are_refusals(
         simulation.report() == "axiom: invalid-delta: delta must lie strictly between zero and one"
             && simulation.outcome() == Outcome::Refused,
         simulation.report(),
+    )?;
+    let inference = CliError::from(InferError::StepBudgetExceeded { limit: 9 });
+    ensure(
+        inference.report()
+            == "axiom: step-budget-exceeded: both states were not visited often enough within 9 steps"
+            && inference.outcome() == Outcome::Refused,
+        inference.report(),
     )
 }
 

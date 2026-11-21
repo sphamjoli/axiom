@@ -42,6 +42,36 @@ pub enum Command {
         #[command(flatten)]
         estimate: EstimateArgs,
     },
+    /// Run a two-state chain as a black box from a seed, propose a candidate
+    /// fixed point and contraction factor from the samples, and label each
+    /// proven only when the model is supplied and the Lean checker accepts
+    /// the engine's exact claim.
+    Explore {
+        /// The model file whose chain is run.
+        #[arg(value_name = "MODEL")]
+        model: PathBuf,
+        /// Hide the model from the analysis: candidates come from samples
+        /// only and ship as estimates, never proven.
+        #[arg(long)]
+        black_box: bool,
+        /// The certificate file to write.
+        #[arg(long, value_name = "OUT")]
+        cert: PathBuf,
+        /// The seed the samples are drawn with.
+        #[arg(long, value_name = "U64")]
+        seed: u64,
+        /// The tolerance, a fraction such as 1/100 strictly between zero and
+        /// one.
+        #[arg(long, value_name = "FRACTION", value_parser = fraction)]
+        epsilon: Option<BigRational>,
+        /// The failure probability, a fraction such as 1/1000 strictly
+        /// between zero and one.
+        #[arg(long, value_name = "FRACTION", value_parser = fraction)]
+        delta: Option<BigRational>,
+        /// Where and how long the checker runs.
+        #[command(flatten)]
+        checker: CheckerArgs,
+    },
     /// Run the Lean checker on a certificate and print the verdict on each
     /// claim.
     Check {
@@ -74,7 +104,8 @@ pub struct EstimateArgs {
     pub delta: Option<BigRational>,
 }
 
-/// The tolerance used when `--epsilon` is not given.
+/// The tolerance used when `--epsilon` is not given, by `analyse --estimate`
+/// and by `explore`.
 pub const DEFAULT_EPSILON: (u32, u32) = (1, 100);
 
 /// The failure probability used when `--delta` is not given.
@@ -95,21 +126,35 @@ pub struct EstimateRequest {
     pub delta: BigRational,
 }
 
+impl EstimateRequest {
+    /// The request with `seed`, filling in [`DEFAULT_EPSILON`] and
+    /// [`DEFAULT_DELTA`] for a tolerance or failure probability not given.
+    #[must_use]
+    pub fn with_defaults(
+        seed: u64,
+        epsilon: Option<BigRational>,
+        delta: Option<BigRational>,
+    ) -> Self {
+        let ratio = |(n, d): (u32, u32)| BigRational::new(BigInt::from(n), BigInt::from(d));
+        Self {
+            seed,
+            epsilon: epsilon.unwrap_or_else(|| ratio(DEFAULT_EPSILON)),
+            delta: delta.unwrap_or_else(|| ratio(DEFAULT_DELTA)),
+        }
+    }
+}
+
 impl EstimateArgs {
     /// The estimate requested, or `None` without `--estimate`. Clap has
     /// already required `--seed` with `--estimate`.
     #[must_use]
     pub fn request(&self) -> Option<EstimateRequest> {
-        let ratio = |(n, d): (u32, u32)| BigRational::new(BigInt::from(n), BigInt::from(d));
         let seed = self.seed.filter(|_| self.estimate)?;
-        Some(EstimateRequest {
+        Some(EstimateRequest::with_defaults(
             seed,
-            epsilon: self
-                .epsilon
-                .clone()
-                .unwrap_or_else(|| ratio(DEFAULT_EPSILON)),
-            delta: self.delta.clone().unwrap_or_else(|| ratio(DEFAULT_DELTA)),
-        })
+            self.epsilon.clone(),
+            self.delta.clone(),
+        ))
     }
 }
 

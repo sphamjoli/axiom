@@ -53,7 +53,9 @@ fn requested(extra: &[&str]) -> Result<Option<EstimateRequest>, TestError> {
     let cli = parse(&words).map_err(|error| TestError::Unexpected(error.to_string()))?;
     match cli.command {
         Command::Analyse { estimate, .. } => Ok(estimate.request()),
-        Command::Check { .. } => Err(TestError::Unexpected("not analyse".to_owned())),
+        Command::Check { .. } | Command::Explore { .. } => {
+            Err(TestError::Unexpected("not analyse".to_owned()))
+        }
     }
 }
 
@@ -200,6 +202,44 @@ fn exit_codes_are_stable_and_listed_in_the_help() -> Result<(), TestError> {
     for outcome in Outcome::ALL {
         let line = format!("{:<3} {}", outcome.exit_code(), outcome.label());
         ensure(help.contains(&line), format!("help lacks {line:?}"))?;
+    }
+    Ok(())
+}
+
+#[test]
+fn explore_needs_a_seed_and_a_certificate_and_takes_black_box() -> Result<(), TestError> {
+    let cli = parse(&[
+        "explore",
+        "m.axm",
+        "--black-box",
+        "--seed",
+        "3",
+        "--cert",
+        "o.json",
+    ])
+    .map_err(|error| TestError::Unexpected(error.to_string()))?;
+    let Command::Explore {
+        black_box, seed, ..
+    } = cli.command
+    else {
+        return Err(TestError::Unexpected("not explore".to_owned()));
+    };
+    ensure(black_box && seed == 3, "flags differ")?;
+    for words in [
+        &["explore", "m.axm", "--cert", "o.json"][..],
+        &["explore", "m.axm", "--seed", "3"][..],
+        &[
+            "explore",
+            "m.axm",
+            "--seed",
+            "3",
+            "--cert",
+            "o.json",
+            "--epsilon",
+            "1/0",
+        ][..],
+    ] {
+        ensure(refused(words).is_some(), format!("{words:?} parsed"))?;
     }
     Ok(())
 }
