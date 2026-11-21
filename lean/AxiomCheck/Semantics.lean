@@ -155,6 +155,21 @@ def TerminationHolds (m : Retry) (probability : Rat) : Prop :=
 /-- The rational value of a certificate fraction. -/
 def Fraction.toRat (f : Fraction) : Rat := (f.num : Rat) / (f.den : Rat)
 
+/-- The rational value of a signed certificate fraction. -/
+def SignedFraction.toRat (f : SignedFraction) : Rat :=
+  if f.negative then -((f.num : Rat) / (f.den : Rat)) else (f.num : Rat) / (f.den : Rat)
+
+/-- The two-state chain of a certificate whose model has exactly two rows of
+two entries. With states ordered as in the certificate, `a = rows[0][1]` is
+the probability of leaving the first state and `b = rows[1][0]` that of
+leaving the second, so the probability `d` of the second state evolves by
+`d' = (1 - a - b) d + a`, the convention the engine uses. The diagonal entries
+are not read; that each row sums to one is the business of `Mass` claims. -/
+def twoState (c : Certificate) : Option TwoState :=
+  match c.rows with
+  | [[_, a], [b, _]] => some ⟨Fraction.toRat a, Fraction.toRat b⟩
+  | _ => none
+
 /-- The rational entries of row `r` of a certificate, if it exists. -/
 def rowValues (c : Certificate) (r : Nat) : Option (List Rat) :=
   (c.rows[r]?).map (·.map Fraction.toRat)
@@ -162,6 +177,8 @@ def rowValues (c : Certificate) (r : Nat) : Option (List Rat) :=
 /-- What a claim in a certificate asserts about its embedded model. -/
 def ClaimHolds (c : Certificate) : Claim → Prop
   | .mass r => ∃ row, rowValues c r = some row ∧ MassHolds row
+  | .fixedPoint v => ∃ m, twoState c = some m ∧ FixedPointHolds m (Fraction.toRat v)
+  | .contraction f => ∃ m, twoState c = some m ∧ ContractionHolds m (SignedFraction.toRat f)
 
 /-- Every claim of the certificate holds. -/
 def CertificateHolds (c : Certificate) : Prop :=
