@@ -176,8 +176,10 @@ fn sampling_line(found: &Candidates, request: &EstimateRequest) -> String {
     )
 }
 
-/// The line for one candidate: its value, its bounds and its label, with
-/// the exact value when the checker proved the engine's claim.
+/// The line for one candidate: its value, its bounds and its label. A
+/// sampled candidate is always an estimate; when the checker proved the
+/// engine's claim, the line adds the exact value it proved, so the proof is
+/// attached to the exact value and never to the sampled one.
 fn candidate_line(
     name: &str,
     value: Option<&BigRational>,
@@ -190,7 +192,7 @@ fn candidate_line(
         |bounds| format!("[{}, {}]", bounds.lower, bounds.upper),
     );
     let label = match proven {
-        Some(exact) => format!("{PROVEN}, exact value {exact}"),
+        Some(exact) => format!("{ESTIMATED}; exact value {exact} {PROVEN}"),
         None => ESTIMATED.to_owned(),
     };
     format!("candidate {name} {value} in {bounds}: {label}")

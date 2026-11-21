@@ -50,8 +50,8 @@ fn lean_promotes_the_links_candidates_when_the_model_is_supplied() -> Result<(),
     ensure(output.status.code() == Some(0), "exit status 0")?;
     let lines = candidates(&output);
     let expected = [
-        format!("{PROVEN}, exact value 1/4"),
-        format!("{PROVEN}, exact value 3/5"),
+        format!("{ESTIMATED}; exact value 1/4 {PROVEN}"),
+        format!("{ESTIMATED}; exact value 3/5 {PROVEN}"),
     ];
     ensure(
         lines.len() == 2
