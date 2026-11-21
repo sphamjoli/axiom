@@ -1,0 +1,151 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="1360" viewBox="0 0 960 1360" font-family="sans-serif" font-size="12">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="480.0" y="28" font-size="16" text-anchor="middle">Simulation time over checking time, per claim kind (log scale)</text>
+<line x1="360.0" y1="60.0" x2="360.0" y2="1300.0" stroke="#dddddd"/>
+<text x="360.0" y="1316.0" text-anchor="middle">1e-3</text>
+<line x1="422.2" y1="60.0" x2="422.2" y2="1300.0" stroke="#dddddd"/>
+<text x="422.2" y="1316.0" text-anchor="middle">1e-2</text>
+<line x1="484.4" y1="60.0" x2="484.4" y2="1300.0" stroke="#dddddd"/>
+<text x="484.4" y="1316.0" text-anchor="middle">1e-1</text>
+<line x1="546.7" y1="60.0" x2="546.7" y2="1300.0" stroke="#dddddd"/>
+<text x="546.7" y="1316.0" text-anchor="middle">1e0</text>
+<line x1="608.9" y1="60.0" x2="608.9" y2="1300.0" stroke="#dddddd"/>
+<text x="608.9" y="1316.0" text-anchor="middle">1e1</text>
+<line x1="671.1" y1="60.0" x2="671.1" y2="1300.0" stroke="#dddddd"/>
+<text x="671.1" y="1316.0" text-anchor="middle">1e2</text>
+<line x1="733.3" y1="60.0" x2="733.3" y2="1300.0" stroke="#dddddd"/>
+<text x="733.3" y="1316.0" text-anchor="middle">1e3</text>
+<line x1="795.6" y1="60.0" x2="795.6" y2="1300.0" stroke="#dddddd"/>
+<text x="795.6" y="1316.0" text-anchor="middle">1e4</text>
+<line x1="857.8" y1="60.0" x2="857.8" y2="1300.0" stroke="#dddddd"/>
+<text x="857.8" y="1316.0" text-anchor="middle">1e5</text>
+<line x1="920.0" y1="60.0" x2="920.0" y2="1300.0" stroke="#dddddd"/>
+<text x="920.0" y="1316.0" text-anchor="middle">1e6</text>
+<line x1="546.7" y1="60.0" x2="546.7" y2="1300.0" stroke="#333333"/>
+<line x1="608.9" y1="60.0" x2="608.9" y2="1300.0" stroke="#333333" stroke-dasharray="4 3"/>
+<text x="640.0" y="1334.0" text-anchor="middle">ratio (simulate / check); dashed line: 10x</text>
+<text x="352.0" y="74.0" text-anchor="end">links Mass</text>
+<rect x="463.7" y="63.0" width="83.0" height="14.0" fill="#c92a2a"><title>links Mass: 0.05</title></rect>
+<text x="352.0" y="94.0" text-anchor="end">links FixedPoint</text>
+<rect x="536.0" y="83.0" width="10.7" height="14.0" fill="#c92a2a"><title>links FixedPoint: 0.67</title></rect>
+<text x="352.0" y="114.0" text-anchor="end">links Contraction</text>
+<rect x="497.6" y="103.0" width="49.1" height="14.0" fill="#c92a2a"><title>links Contraction: 0.16</title></rect>
+<text x="352.0" y="134.0" text-anchor="end">links ConvergenceBound</text>
+<rect x="501.4" y="123.0" width="45.3" height="14.0" fill="#c92a2a"><title>links ConvergenceBound: 0.19</title></rect>
+<text x="352.0" y="154.0" text-anchor="end">links-param ParametricContraction</text>
+<rect x="546.7" y="143.0" width="80.1" height="14.0" fill="#2b8a3e"><title>links-param ParametricContraction: 19</title></rect>
+<text x="352.0" y="174.0" text-anchor="end">periodic Mass</text>
+<rect x="444.5" y="163.0" width="102.1" height="14.0" fill="#c92a2a"><title>periodic Mass: 0.02</title></rect>
+<text x="352.0" y="194.0" text-anchor="end">retry Termination</text>
+<rect x="471.8" y="183.0" width="74.9" height="14.0" fill="#c92a2a"><title>retry Termination: 0.06</title></rect>
+<text x="352.0" y="214.0" text-anchor="end">templates/flip Mass</text>
+<rect x="446.1" y="203.0" width="100.5" height="14.0" fill="#c92a2a"><title>templates/flip Mass: 0.02</title></rect>
+<text x="352.0" y="234.0" text-anchor="end">templates/server Mass</text>
+<rect x="484.6" y="223.0" width="62.1" height="14.0" fill="#c92a2a"><title>templates/server Mass: 0.10</title></rect>
+<text x="352.0" y="254.0" text-anchor="end">templates/slow-repair Mass</text>
+<rect x="459.2" y="243.0" width="87.4" height="14.0" fill="#c92a2a"><title>templates/slow-repair Mass: 0.04</title></rect>
+<text x="352.0" y="274.0" text-anchor="end">templates/slow-repair FixedPoint</text>
+<rect x="546.7" y="263.0" width="10.9" height="14.0" fill="#e8a33d"><title>templates/slow-repair FixedPoint: 1.50</title></rect>
+<text x="352.0" y="294.0" text-anchor="end">templates/slow-repair Contraction</text>
+<rect x="501.2" y="283.0" width="45.5" height="14.0" fill="#c92a2a"><title>templates/slow-repair Contraction: 0.19</title></rect>
+<text x="352.0" y="314.0" text-anchor="end">templates/slow-repair ConvergenceBound</text>
+<rect x="517.8" y="303.0" width="28.9" height="14.0" fill="#c92a2a"><title>templates/slow-repair ConvergenceBound: 0.34</title></rect>
+<text x="352.0" y="334.0" text-anchor="end">states-3 Mass</text>
+<rect x="492.2" y="323.0" width="54.5" height="14.0" fill="#c92a2a"><title>states-3 Mass: 0.13</title></rect>
+<text x="352.0" y="354.0" text-anchor="end">states-4 Mass</text>
+<rect x="501.1" y="343.0" width="45.5" height="14.0" fill="#c92a2a"><title>states-4 Mass: 0.19</title></rect>
+<text x="352.0" y="374.0" text-anchor="end">states-8 Mass</text>
+<rect x="525.3" y="363.0" width="21.3" height="14.0" fill="#c92a2a"><title>states-8 Mass: 0.45</title></rect>
+<text x="352.0" y="394.0" text-anchor="end">states-12 Mass</text>
+<rect x="540.4" y="383.0" width="6.3" height="14.0" fill="#c92a2a"><title>states-12 Mass: 0.79</title></rect>
+<text x="352.0" y="414.0" text-anchor="end">states-16 Mass</text>
+<rect x="546.7" y="403.0" width="3.5" height="14.0" fill="#e8a33d"><title>states-16 Mass: 1.14</title></rect>
+<text x="352.0" y="434.0" text-anchor="end">horizon-5 Mass</text>
+<rect x="462.6" y="423.0" width="84.1" height="14.0" fill="#c92a2a"><title>horizon-5 Mass: 0.04</title></rect>
+<text x="352.0" y="454.0" text-anchor="end">horizon-5 FixedPoint</text>
+<rect x="544.3" y="443.0" width="2.4" height="14.0" fill="#c92a2a"><title>horizon-5 FixedPoint: 0.92</title></rect>
+<text x="352.0" y="474.0" text-anchor="end">horizon-5 Contraction</text>
+<rect x="497.8" y="463.0" width="48.8" height="14.0" fill="#c92a2a"><title>horizon-5 Contraction: 0.16</title></rect>
+<text x="352.0" y="494.0" text-anchor="end">horizon-5 ConvergenceBound</text>
+<rect x="504.2" y="483.0" width="42.5" height="14.0" fill="#c92a2a"><title>horizon-5 ConvergenceBound: 0.21</title></rect>
+<text x="352.0" y="514.0" text-anchor="end">horizon-10 Mass</text>
+<rect x="460.5" y="503.0" width="86.1" height="14.0" fill="#c92a2a"><title>horizon-10 Mass: 0.04</title></rect>
+<text x="352.0" y="534.0" text-anchor="end">horizon-10 FixedPoint</text>
+<rect x="546.7" y="523.0" width="10.6" height="14.0" fill="#e8a33d"><title>horizon-10 FixedPoint: 1.48</title></rect>
+<text x="352.0" y="554.0" text-anchor="end">horizon-10 Contraction</text>
+<rect x="493.1" y="543.0" width="53.6" height="14.0" fill="#c92a2a"><title>horizon-10 Contraction: 0.14</title></rect>
+<text x="352.0" y="574.0" text-anchor="end">horizon-10 ConvergenceBound</text>
+<rect x="517.3" y="563.0" width="29.3" height="14.0" fill="#c92a2a"><title>horizon-10 ConvergenceBound: 0.34</title></rect>
+<text x="352.0" y="594.0" text-anchor="end">horizon-20 Mass</text>
+<rect x="455.9" y="583.0" width="90.7" height="14.0" fill="#c92a2a"><title>horizon-20 Mass: 0.03</title></rect>
+<text x="352.0" y="614.0" text-anchor="end">horizon-20 FixedPoint</text>
+<rect x="546.7" y="603.0" width="24.4" height="14.0" fill="#e8a33d"><title>horizon-20 FixedPoint: 2.47</title></rect>
+<text x="352.0" y="634.0" text-anchor="end">horizon-20 Contraction</text>
+<rect x="488.7" y="623.0" width="57.9" height="14.0" fill="#c92a2a"><title>horizon-20 Contraction: 0.12</title></rect>
+<text x="352.0" y="654.0" text-anchor="end">horizon-20 ConvergenceBound</text>
+<rect x="531.7" y="643.0" width="15.0" height="14.0" fill="#c92a2a"><title>horizon-20 ConvergenceBound: 0.57</title></rect>
+<text x="352.0" y="674.0" text-anchor="end">horizon-50 Mass</text>
+<rect x="449.8" y="663.0" width="96.9" height="14.0" fill="#c92a2a"><title>horizon-50 Mass: 0.03</title></rect>
+<text x="352.0" y="694.0" text-anchor="end">horizon-50 FixedPoint</text>
+<rect x="546.7" y="683.0" width="44.4" height="14.0" fill="#e8a33d"><title>horizon-50 FixedPoint: 5.16</title></rect>
+<text x="352.0" y="714.0" text-anchor="end">horizon-50 Contraction</text>
+<rect x="485.2" y="703.0" width="61.5" height="14.0" fill="#c92a2a"><title>horizon-50 Contraction: 0.10</title></rect>
+<text x="352.0" y="734.0" text-anchor="end">horizon-50 ConvergenceBound</text>
+<rect x="546.7" y="723.0" width="8.0" height="14.0" fill="#e8a33d"><title>horizon-50 ConvergenceBound: 1.34</title></rect>
+<text x="352.0" y="754.0" text-anchor="end">horizon-100 Mass</text>
+<rect x="439.3" y="743.0" width="107.3" height="14.0" fill="#c92a2a"><title>horizon-100 Mass: 0.02</title></rect>
+<text x="352.0" y="774.0" text-anchor="end">horizon-100 FixedPoint</text>
+<rect x="546.7" y="763.0" width="54.0" height="14.0" fill="#e8a33d"><title>horizon-100 FixedPoint: 7.38</title></rect>
+<text x="352.0" y="794.0" text-anchor="end">horizon-100 Contraction</text>
+<rect x="475.4" y="783.0" width="71.3" height="14.0" fill="#c92a2a"><title>horizon-100 Contraction: 0.07</title></rect>
+<text x="352.0" y="814.0" text-anchor="end">horizon-100 ConvergenceBound</text>
+<rect x="546.7" y="803.0" width="13.9" height="14.0" fill="#e8a33d"><title>horizon-100 ConvergenceBound: 1.68</title></rect>
+<text x="352.0" y="834.0" text-anchor="end">horizon-200 Mass</text>
+<rect x="448.1" y="823.0" width="98.5" height="14.0" fill="#c92a2a"><title>horizon-200 Mass: 0.03</title></rect>
+<text x="352.0" y="854.0" text-anchor="end">horizon-200 FixedPoint</text>
+<rect x="546.7" y="843.0" width="81.2" height="14.0" fill="#2b8a3e"><title>horizon-200 FixedPoint: 20</title></rect>
+<text x="352.0" y="874.0" text-anchor="end">horizon-200 Contraction</text>
+<rect x="483.6" y="863.0" width="63.0" height="14.0" fill="#c92a2a"><title>horizon-200 Contraction: 0.10</title></rect>
+<text x="352.0" y="894.0" text-anchor="end">horizon-200 ConvergenceBound</text>
+<rect x="546.7" y="883.0" width="42.4" height="14.0" fill="#e8a33d"><title>horizon-200 ConvergenceBound: 4.81</title></rect>
+<text x="352.0" y="914.0" text-anchor="end">tolerance-2 Mass</text>
+<rect x="464.2" y="903.0" width="82.5" height="14.0" fill="#c92a2a"><title>tolerance-2 Mass: 0.05</title></rect>
+<text x="352.0" y="934.0" text-anchor="end">tolerance-2 FixedPoint</text>
+<rect x="537.6" y="923.0" width="9.1" height="14.0" fill="#c92a2a"><title>tolerance-2 FixedPoint: 0.71</title></rect>
+<text x="352.0" y="954.0" text-anchor="end">tolerance-2 Contraction</text>
+<rect x="498.7" y="943.0" width="48.0" height="14.0" fill="#c92a2a"><title>tolerance-2 Contraction: 0.17</title></rect>
+<text x="352.0" y="974.0" text-anchor="end">tolerance-2 ConvergenceBound</text>
+<rect x="370.1" y="963.0" width="176.5" height="14.0" fill="#c92a2a"><title>tolerance-2 ConvergenceBound: 0.00</title></rect>
+<text x="352.0" y="994.0" text-anchor="end">tolerance-3 Mass</text>
+<rect x="464.5" y="983.0" width="82.2" height="14.0" fill="#c92a2a"><title>tolerance-3 Mass: 0.05</title></rect>
+<text x="352.0" y="1014.0" text-anchor="end">tolerance-3 FixedPoint</text>
+<rect x="537.8" y="1003.0" width="8.9" height="14.0" fill="#c92a2a"><title>tolerance-3 FixedPoint: 0.72</title></rect>
+<text x="352.0" y="1034.0" text-anchor="end">tolerance-3 Contraction</text>
+<rect x="498.5" y="1023.0" width="48.2" height="14.0" fill="#c92a2a"><title>tolerance-3 Contraction: 0.17</title></rect>
+<text x="352.0" y="1054.0" text-anchor="end">tolerance-3 ConvergenceBound</text>
+<rect x="502.6" y="1043.0" width="44.0" height="14.0" fill="#c92a2a"><title>tolerance-3 ConvergenceBound: 0.20</title></rect>
+<text x="352.0" y="1074.0" text-anchor="end">tolerance-4 Mass</text>
+<rect x="465.7" y="1063.0" width="81.0" height="14.0" fill="#c92a2a"><title>tolerance-4 Mass: 0.05</title></rect>
+<text x="352.0" y="1094.0" text-anchor="end">tolerance-4 FixedPoint</text>
+<rect x="537.3" y="1083.0" width="9.4" height="14.0" fill="#c92a2a"><title>tolerance-4 FixedPoint: 0.71</title></rect>
+<text x="352.0" y="1114.0" text-anchor="end">tolerance-4 Contraction</text>
+<rect x="498.3" y="1103.0" width="48.4" height="14.0" fill="#c92a2a"><title>tolerance-4 Contraction: 0.17</title></rect>
+<text x="352.0" y="1134.0" text-anchor="end">tolerance-4 ConvergenceBound</text>
+<rect x="546.7" y="1123.0" width="89.3" height="14.0" fill="#2b8a3e"><title>tolerance-4 ConvergenceBound: 27</title></rect>
+<text x="352.0" y="1154.0" text-anchor="end">tolerance-5 Mass</text>
+<rect x="464.0" y="1143.0" width="82.7" height="14.0" fill="#c92a2a"><title>tolerance-5 Mass: 0.05</title></rect>
+<text x="352.0" y="1174.0" text-anchor="end">tolerance-5 FixedPoint</text>
+<rect x="535.7" y="1163.0" width="11.0" height="14.0" fill="#c92a2a"><title>tolerance-5 FixedPoint: 0.67</title></rect>
+<text x="352.0" y="1194.0" text-anchor="end">tolerance-5 Contraction</text>
+<rect x="496.5" y="1183.0" width="50.1" height="14.0" fill="#c92a2a"><title>tolerance-5 Contraction: 0.16</title></rect>
+<text x="352.0" y="1214.0" text-anchor="end">tolerance-5 ConvergenceBound</text>
+<rect x="546.7" y="1203.0" width="216.7" height="14.0" fill="#2b8a3e"><title>tolerance-5 ConvergenceBound: 3.04e3</title></rect>
+<text x="352.0" y="1234.0" text-anchor="end">tolerance-6 Mass</text>
+<rect x="466.0" y="1223.0" width="80.7" height="14.0" fill="#c92a2a"><title>tolerance-6 Mass: 0.05</title></rect>
+<text x="352.0" y="1254.0" text-anchor="end">tolerance-6 FixedPoint</text>
+<rect x="537.4" y="1243.0" width="9.2" height="14.0" fill="#c92a2a"><title>tolerance-6 FixedPoint: 0.71</title></rect>
+<text x="352.0" y="1274.0" text-anchor="end">tolerance-6 Contraction</text>
+<rect x="498.0" y="1263.0" width="48.7" height="14.0" fill="#c92a2a"><title>tolerance-6 Contraction: 0.17</title></rect>
+<text x="352.0" y="1294.0" text-anchor="end">tolerance-6 ConvergenceBound</text>
+<rect x="546.7" y="1283.0" width="349.2" height="14.0" fill="#2b8a3e"><title>tolerance-6 ConvergenceBound: 4.09e5</title></rect>
+</svg>

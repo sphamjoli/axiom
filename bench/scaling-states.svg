@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="490" viewBox="0 0 960 490" font-family="sans-serif" font-size="12">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="480.0" y="28" font-size="16" text-anchor="middle">Mass on a random walk: check against simulate as the states grow</text>
+<line x1="90.0" y1="60.0" x2="90.0" y2="420.0" stroke="#eeeeee"/>
+<text x="90.0" y="436.0" text-anchor="middle">1e0</text>
+<line x1="505.0" y1="60.0" x2="505.0" y2="420.0" stroke="#eeeeee"/>
+<text x="505.0" y="436.0" text-anchor="middle">1e1</text>
+<line x1="920.0" y1="60.0" x2="920.0" y2="420.0" stroke="#eeeeee"/>
+<text x="920.0" y="436.0" text-anchor="middle">1e2</text>
+<line x1="90.0" y1="420.0" x2="920.0" y2="420.0" stroke="#eeeeee"/>
+<text x="84.0" y="424.0" text-anchor="end">1e2 ms</text>
+<line x1="90.0" y1="240.0" x2="920.0" y2="240.0" stroke="#eeeeee"/>
+<text x="84.0" y="244.0" text-anchor="end">1e3 ms</text>
+<line x1="90.0" y1="60.0" x2="920.0" y2="60.0" stroke="#eeeeee"/>
+<text x="84.0" y="64.0" text-anchor="end">1e4 ms</text>
+<rect x="90.0" y="60.0" width="830.0" height="360.0" fill="none" stroke="#333333"/>
+<text x="505.0" y="456.0" text-anchor="middle">states (log scale)</text>
+<polyline points="288.0,246.6 339.9,246.2 464.8,245.7 537.9,246.0 589.7,241.6" fill="none" stroke="#1c7ed6" stroke-width="2"/>
+<circle cx="288.0" cy="246.6" r="3.5" fill="#1c7ed6"/>
+<circle cx="339.9" cy="246.2" r="3.5" fill="#1c7ed6"/>
+<circle cx="464.8" cy="245.7" r="3.5" fill="#1c7ed6"/>
+<circle cx="537.9" cy="246.0" r="3.5" fill="#1c7ed6"/>
+<circle cx="589.7" cy="241.6" r="3.5" fill="#1c7ed6"/>
+<rect x="90.0" y="470.0" width="14" height="4" fill="#1c7ed6"/>
+<text x="110.0" y="476.0">Lean check</text>
+<polyline points="288.0,404.3 339.9,377.9 464.8,307.4 537.9,264.3 589.7,231.5" fill="none" stroke="#c92a2a" stroke-width="2"/>
+<circle cx="288.0" cy="404.3" r="3.5" fill="#c92a2a"/>
+<circle cx="339.9" cy="377.9" r="3.5" fill="#c92a2a"/>
+<circle cx="464.8" cy="307.4" r="3.5" fill="#c92a2a"/>
+<circle cx="537.9" cy="264.3" r="3.5" fill="#c92a2a"/>
+<circle cx="589.7" cy="231.5" r="3.5" fill="#c92a2a"/>
+<rect x="250.0" y="470.0" width="14" height="4" fill="#c92a2a"/>
+<text x="270.0" y="476.0">simulation</text>
+</svg>

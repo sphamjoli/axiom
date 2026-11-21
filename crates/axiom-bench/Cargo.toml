@@ -1,0 +1,26 @@
+[package]
+name = "axiom-bench"
+description = "Benchmarks the engine, the Lean checker and simulation, and compares checking with simulating to the same confidence"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "axiom-bench"
+path = "src/main.rs"
+
+[dependencies]
+axiom-cert = { workspace = true }
+axiom-cli = { workspace = true }
+axiom-core = { workspace = true }
+axiom-model = { workspace = true }
+axiom-sim = { workspace = true }
+clap = { workspace = true }
+num-bigint = { workspace = true }
+num-rational = { workspace = true }
+num-traits = { workspace = true }
+thiserror = { workspace = true }
+
+[lints]
+workspace = true

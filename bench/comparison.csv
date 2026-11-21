@@ -1,0 +1,63 @@
+case,family,parameter,kind,conclusion,check_ms,sim_samples,sim_draws,sim_ms,sim_extrapolated,lower_bound,ratio
+links,fixture,0,Mass,each of 2 rows sums to one,929.7,8987198,8987198,43.2,false,false,0.046
+links,fixture,0,FixedPoint,steady state 1/4,929.7,15201805,197623465,626.6,true,false,0.674
+links,fixture,0,Contraction,contraction factor 3/5,929.7,33176200,33176200,151.3,true,false,0.163
+links,fixture,0,ConvergenceBound,within 1/1000 after 13 steps,929.7,3800452,49405876,173.9,false,false,0.187
+links-param,fixture,0,ParametricContraction,contracts for every a and b in range (10x10 grid sampled),913.0,3317620000,3317620000,17720.9,true,true,19.410
+periodic,fixture,0,Mass,each of 2 rows sums to one,933.8,8987198,8987198,21.3,false,false,0.023
+retry,fixture,0,Termination,terminates with expected attempts 10/3,911.8,3800452,76009040,57.1,false,false,0.063
+templates/flip,fixture,0,Mass,each of 2 rows sums to one,902.0,8987198,8987198,21.9,false,false,0.024
+templates/server,fixture,0,Mass,each of 3 rows sums to one,908.3,14697192,14697192,91.4,false,false,0.101
+templates/slow-repair,fixture,0,Mass,each of 2 rows sums to one,904.7,8987198,8987198,35.6,false,false,0.039
+templates/slow-repair,fixture,0,FixedPoint,steady state 1/2,904.7,15201805,471255955,1355.4,true,false,1.498
+templates/slow-repair,fixture,0,Contraction,contraction factor 4/5,904.7,33176200,33176200,168.2,true,false,0.186
+templates/slow-repair,fixture,0,ConvergenceBound,within 1/1000 after 28 steps,904.7,3800452,106412656,310.4,false,false,0.343
+states-3,states,3,Mass,each of 3 rows sums to one,918.8,14697192,14697192,122.3,false,false,0.133
+states-4,states,4,Mass,each of 4 rows sums to one,924.0,20746984,20746984,171.2,false,false,0.185
+states-8,states,8,Mass,each of 8 rows sums to one,929.7,47039144,47039144,422.4,false,false,0.454
+states-12,states,12,Mass,each of 12 rows sums to one,925.5,75424296,75424296,732.6,false,false,0.792
+states-16,states,16,Mass,each of 16 rows sums to one,980.2,105168640,105168640,1114.8,false,false,1.137
+horizon-5,horizon,5,Mass,each of 2 rows sums to one,905.5,8987198,8987198,40.3,false,false,0.045
+horizon-5,horizon,5,FixedPoint,steady state 1/2,905.5,15201805,212825270,829.4,true,false,0.916
+horizon-5,horizon,5,Contraction,contraction factor 3/5,905.5,33176200,33176200,148.6,true,false,0.164
+horizon-5,horizon,5,ConvergenceBound,within 1/1000 after 13 steps,905.5,3800452,49405876,187.8,false,false,0.207
+horizon-10,horizon,10,Mass,each of 2 rows sums to one,912.6,8987198,8987198,37.7,false,false,0.041
+horizon-10,horizon,10,FixedPoint,steady state 1/2,912.6,15201805,471255955,1350.6,true,false,1.480
+horizon-10,horizon,10,Contraction,contraction factor 4/5,912.6,33176200,33176200,125.6,true,false,0.138
+horizon-10,horizon,10,ConvergenceBound,within 1/1000 after 28 steps,912.6,3800452,106412656,308.2,false,false,0.338
+horizon-20,horizon,20,Mass,each of 2 rows sums to one,913.2,8987198,8987198,31.8,false,false,0.035
+horizon-20,horizon,20,FixedPoint,steady state 1/2,913.2,15201805,1003319130,2253.6,true,false,2.468
+horizon-20,horizon,20,Contraction,contraction factor 9/10,913.2,33176200,33176200,107.0,true,false,0.117
+horizon-20,horizon,20,ConvergenceBound,within 1/1000 after 59 steps,913.2,3800452,224226668,524.4,true,false,0.574
+horizon-50,horizon,50,Mass,each of 2 rows sums to one,942.0,8987198,8987198,26.1,false,false,0.028
+horizon-50,horizon,50,FixedPoint,steady state 1/2,942.0,15201805,2584306850,4862.5,true,false,5.162
+horizon-50,horizon,50,Contraction,contraction factor 24/25,942.0,33176200,33176200,96.8,true,false,0.103
+horizon-50,horizon,50,ConvergenceBound,within 1/1000 after 153 steps,942.0,3800452,581469156,1265.7,true,false,1.344
+horizon-100,horizon,100,Mass,each of 2 rows sums to one,1265.1,8987198,8987198,23.8,false,false,0.019
+horizon-100,horizon,100,FixedPoint,steady state 1/2,1265.1,15201805,5199017310,9337.6,true,false,7.381
+horizon-100,horizon,100,Contraction,contraction factor 49/50,1265.1,33176200,33176200,90.5,true,false,0.072
+horizon-100,horizon,100,ConvergenceBound,within 1/1000 after 308 steps,1265.1,3800452,1170539216,2119.2,true,false,1.675
+horizon-200,horizon,200,Mass,each of 2 rows sums to one,853.4,8987198,8987198,22.3,false,false,0.026
+horizon-200,horizon,200,FixedPoint,steady state 1/2,853.4,15201805,10458841840,17236.6,true,false,20.197
+horizon-200,horizon,200,Contraction,contraction factor 99/100,853.4,33176200,33176200,82.8,true,false,0.097
+horizon-200,horizon,200,ConvergenceBound,within 1/1000 after 619 steps,853.4,3800452,2352479788,4104.7,true,false,4.810
+tolerance-2,tolerance,2,Mass,each of 2 rows sums to one,870.1,8987198,8987198,41.1,false,false,0.047
+tolerance-2,tolerance,2,FixedPoint,steady state 1/4,870.1,15201805,197623465,621.0,true,false,0.714
+tolerance-2,tolerance,2,Contraction,contraction factor 3/5,870.1,33176200,33176200,147.2,true,false,0.169
+tolerance-2,tolerance,2,ConvergenceBound,within 1/100 after 9 steps,870.1,38005,342045,1.3,false,false,0.001
+tolerance-3,tolerance,3,Mass,each of 2 rows sums to one,884.1,8987198,8987198,42.2,false,false,0.048
+tolerance-3,tolerance,3,FixedPoint,steady state 1/4,884.1,15201805,197623465,636.9,true,false,0.720
+tolerance-3,tolerance,3,Contraction,contraction factor 3/5,884.1,33176200,33176200,148.5,true,false,0.168
+tolerance-3,tolerance,3,ConvergenceBound,within 1/1000 after 13 steps,884.1,3800452,49405876,173.3,false,false,0.196
+tolerance-4,tolerance,4,Mass,each of 2 rows sums to one,869.4,8987198,8987198,43.4,false,false,0.050
+tolerance-4,tolerance,4,FixedPoint,steady state 1/4,869.4,15201805,197623465,614.8,true,false,0.707
+tolerance-4,tolerance,4,Contraction,contraction factor 3/5,869.4,33176200,33176200,145.2,true,false,0.167
+tolerance-4,tolerance,4,ConvergenceBound,within 1/10000 after 18 steps,869.4,380045123,6840812214,23710.4,true,false,27.272
+tolerance-5,tolerance,5,Mass,each of 2 rows sums to one,933.1,8987198,8987198,43.7,false,false,0.047
+tolerance-5,tolerance,5,FixedPoint,steady state 1/4,933.1,15201805,197623465,621.5,true,false,0.666
+tolerance-5,tolerance,5,Contraction,contraction factor 3/5,933.1,33176200,33176200,145.9,true,false,0.156
+tolerance-5,tolerance,5,ConvergenceBound,within 1/100000 after 22 steps,933.1,38004512298,836099270556,2837684.4,true,false,3041.202
+tolerance-6,tolerance,6,Mass,each of 2 rows sums to one,875.8,8987198,8987198,44.3,false,false,0.051
+tolerance-6,tolerance,6,FixedPoint,steady state 1/4,875.8,15201805,197623465,622.6,true,false,0.711
+tolerance-6,tolerance,6,Contraction,contraction factor 3/5,875.8,33176200,33176200,144.6,true,false,0.165
+tolerance-6,tolerance,6,ConvergenceBound,within 1/1000000 after 27 steps,875.8,3800451229772,102612183203844,358393934.2,true,false,409223.597
