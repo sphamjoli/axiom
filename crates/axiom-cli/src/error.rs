@@ -223,8 +223,8 @@ pub enum CliError {
     /// The black box could not be run or its candidates proposed.
     #[error(transparent)]
     Inference(#[from] InferError),
-    /// `explore` was given a model other than a two-state chain without
-    /// parameters, the only model its candidates cover.
+    /// `explore` was given a retry or a chain with parameters; a chain
+    /// without two states is refused by the analysis itself.
     #[error("explore needs a two-state chain without parameters")]
     ExploreUnsupported,
     /// `lake` could not be started or waited for.

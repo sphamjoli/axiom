@@ -77,8 +77,8 @@ impl fmt::Display for Exploration {
 ///
 /// # Errors
 ///
-/// Returns [`CliError::ExploreUnsupported`] for a model other than a
-/// two-state chain without parameters, the errors of reading the model, of
+/// Returns [`CliError::ExploreUnsupported`] for a retry or a chain with
+/// parameters, the errors of reading the model, of
 /// [`axiom_infer::propose`] and of the estimate, [`CliError::WriteFailed`]
 /// when the certificate cannot be written, and the errors of [`check::run`].
 pub fn run(
@@ -91,10 +91,8 @@ pub fn run(
     let CheckedModel::Chain(chain) = axiom_model::parse(&read_model(model)?)? else {
         return Err(CliError::ExploreUnsupported);
     };
-    let matrix = chain
-        .matrix
-        .filter(|matrix| matrix.states() == 2)
-        .ok_or(CliError::ExploreUnsupported)?;
+    // A chain without two states is refused by `propose`.
+    let matrix = chain.matrix.ok_or(CliError::ExploreUnsupported)?;
     let black_box = MatrixBox::new(&matrix);
     let config = Config::new(request.epsilon.clone(), request.delta.clone(), request.seed);
     let found = axiom_infer::propose(&black_box, &config)?;
@@ -111,7 +109,9 @@ pub fn run(
         failure: IoFailure::from(&error),
     })?;
     let report = check::run(cert, checker.lean_dir.as_deref(), checker.timeout())?;
-    let proven = |kind: &str| mode == Mode::ModelSupplied && report.proven(kind);
+    // A black-box certificate holds no `FixedPoint` or `Contraction` claim,
+    // so nothing the checker accepts can promote a black-box candidate.
+    let proven = |kind: &str| report.proven(kind);
     let exact_fixed_point = certificate.claims().iter().find_map(|claim| match claim {
         Claim::FixedPoint { value } => Some(value.value().clone()),
         _ => None,
