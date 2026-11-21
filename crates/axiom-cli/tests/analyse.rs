@@ -53,13 +53,13 @@ fn reproduces_the_golden_certificates() -> Result<(), TestError> {
         "retry.axm",
         &[],
         "retry-termination.json",
-        "retry request: wrote 1 claims",
+        "retry request: wrote 1 claim",
     )?;
     reproduces(
         "links-param.axm",
         &[],
         "links-param.json",
-        "parametric chain links: wrote 1 claims",
+        "parametric chain links: wrote 1 claim",
     )?;
     reproduces(
         "links.axm",

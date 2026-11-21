@@ -25,9 +25,10 @@ pub struct Summary {
 
 impl fmt::Display for Summary {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let noun = if self.claims == 1 { "claim" } else { "claims" };
         write!(
             formatter,
-            "{} wrote {} claims to {}",
+            "{} wrote {} {noun} to {}",
             self.model, self.claims, self.cert
         )
     }
@@ -167,9 +168,8 @@ fn estimated(certificate: Certificate, request: &EstimateRequest) -> Result<Cert
 /// probabilities are exactly two distinct parameters, `a` from the first
 /// state and `b` from the second, or `None` for any other parametric chain.
 /// The parameters are distinct because the model checker rejects a declared
-/// parameter that is never used, and the diagonal needs no check because it
-/// has shown that every row
-/// sums to one.
+/// parameter that is never used, and the diagonal needs no check because the
+/// model checker has shown that every row sums to one.
 fn parametric_ranges(chain: &Chain) -> Option<(Interval, Interval)> {
     let [first, second] = chain.rows.as_slice() else {
         return None;
