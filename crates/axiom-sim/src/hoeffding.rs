@@ -112,12 +112,11 @@ pub fn exp_lower_bound(x: &BigRational) -> BigRational {
 }
 
 /// Whether `n` samples give tolerance `epsilon` with failure probability at
-/// most `delta`: accepts only when `2 exp(-2 n ε²) ≤ δ` holds.
+/// most `delta`: accepts only when `2 exp(-2 n ε²) ≤ δ` holds. A `delta` of
+/// zero or below is always rejected, because the bound is non-negative and
+/// so `δ L ≤ 0 < 2`; the Lean checker tests `0 < δ` explicitly for its proof.
 #[must_use]
 pub fn hoeffding_holds(n: u64, epsilon: &BigRational, delta: &BigRational) -> bool {
-    if *delta <= BigRational::zero() {
-        return false;
-    }
     let exponent = integer(2) * integer(n) * epsilon * epsilon;
     integer(2) <= delta * exp_lower_bound(&exponent)
 }

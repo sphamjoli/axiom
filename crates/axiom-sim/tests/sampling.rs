@@ -98,14 +98,65 @@ fn out_of_range_start_is_refused() -> Result<(), TestError> {
 
 #[test]
 fn parametric_models_are_refused() -> Result<(), TestError> {
-    let source = "param a in ]0, 1[\nchain c {\n  states x, y\n  from x: x 1 - a, y a\n  from y: x 1/2, y 1/2\n}\n";
-    match axiom_model::parse(source)? {
+    let chain = "param a in ]0, 1[\nchain c {\n  states x, y\n  from x: x 1 - a, y a\n  from y: x 1/2, y 1/2\n}\n";
+    match axiom_model::parse(chain)? {
         axiom_model::CheckedModel::Chain(chain) => ensure(
             chain_matrix(&chain).err() == Some(SimError::Parametric),
             "a chain with parameters is refused",
-        ),
-        axiom_model::CheckedModel::Retry(_) => Err(TestError::Form),
+        )?,
+        axiom_model::CheckedModel::Retry(_) => return Err(TestError::Form),
     }
+    let retry = "param p in ]0, 1[\nretry r {\n  success p\n}\n";
+    match axiom_model::parse(retry)? {
+        axiom_model::CheckedModel::Retry(retry) => ensure(
+            retry_probability(&retry).err() == Some(SimError::Parametric),
+            "a retry with parameters is refused",
+        ),
+        axiom_model::CheckedModel::Chain(_) => Err(TestError::Form),
+    }
+}
+
+#[test]
+fn zero_steps_end_where_they_start() -> Result<(), TestError> {
+    let chain = links()?;
+    let run = sample_chain(chain_matrix(&chain)?, 1, 0, 5, 7)?;
+    ensure(
+        run.final_states == vec![1; 5],
+        "every trajectory stays in down",
+    )
+}
+
+#[test]
+fn zero_samples_give_empty_runs() -> Result<(), TestError> {
+    let chain = links()?;
+    let run = sample_chain(chain_matrix(&chain)?, 0, 10, 0, 7)?;
+    ensure(run.samples() == 0 && run.count(0) == 0, "no trajectories")?;
+    let model = retry()?;
+    let retries = sample_retry(retry_probability(&model)?, 10, 0, 7);
+    ensure(
+        retries.samples() == 0 && retries.total_attempts() == 0,
+        "no runs",
+    )
+}
+
+#[test]
+fn zero_attempts_never_succeed() -> Result<(), TestError> {
+    let certain = Probability::try_from_fraction(1, 1)?;
+    let run = sample_retry(&certain, 0, 3, 7);
+    ensure(run.attempts == vec![None; 3], "no attempt, no success")
+}
+
+#[test]
+fn an_impossible_retry_never_succeeds() -> Result<(), TestError> {
+    let never = Probability::try_from_fraction(0, 1)?;
+    let run = sample_retry(&never, 50, 4, 7);
+    ensure(run.attempts == vec![None; 4], "probability 0 gives None")?;
+    let always = Probability::try_from_fraction(1, 1)?;
+    let run = sample_retry(&always, 50, 4, 7);
+    ensure(
+        run.attempts == vec![Some(1); 4],
+        "probability 1 succeeds first",
+    )
 }
 
 /// With `n` from Hoeffding for `ε = 1/50` and `δ = 10^-9`, the sample mean
