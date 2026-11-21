@@ -1,9 +1,9 @@
 # axiom-core must not depend on any other workspace crate; axiom-cert and
-# axiom-model may each depend only on axiom-core; axiom-cli may depend on
-# any of them.
+# axiom-model may each depend only on axiom-core; axiom-cli and axiom-wasm
+# may each depend on any of those three, but not on each other.
 [workspace]
 resolver = "3"
-members = ["crates/axiom-core", "crates/axiom-cert", "crates/axiom-model", "crates/axiom-cli"]
+members = ["crates/axiom-core", "crates/axiom-cert", "crates/axiom-model", "crates/axiom-cli", "crates/axiom-wasm"]
 
 [workspace.package]
 version = "0.1.0"

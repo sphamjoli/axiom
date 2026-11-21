@@ -1,0 +1,27 @@
+[package]
+name = "axiom-wasm"
+description = "The axiom engine compiled to WebAssembly for the web interface"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+axiom-cert = { workspace = true }
+axiom-core = { workspace = true }
+axiom-model = { workspace = true }
+num-bigint = { workspace = true }
+num-rational = { workspace = true }
+num-traits = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+wasm-bindgen = { version = "=0.2.130" }
+
+[dev-dependencies]
+thiserror = { workspace = true }
+
+[lints]
+workspace = true
