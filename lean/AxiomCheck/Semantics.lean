@@ -233,16 +233,25 @@ def failureToRat (failure : Option (Nat × Fraction)) : Option (Nat × Rat) :=
 def rowValues (c : Certificate) (r : Nat) : Option (List Rat) :=
   (c.rows[r]?).map (·.map Fraction.toRat)
 
+/-- Every row of the certificate's matrix is a probability distribution. -/
+def RowsHold (c : Certificate) : Prop :=
+  ∀ row ∈ c.rows, MassHolds (row.map Fraction.toRat)
+
 /-- What a claim in a certificate asserts about its embedded model, as
-decidable facts. For `convergenceBound` and `termination` these are the
+decidable facts. Every two-state claim also requires that each row is a
+probability distribution, so it is never accepted about a matrix that is not
+stochastic, and `fixedPoint` requires `a + b ≠ 0`, so the fixed point is
+unique: the stationary probability. For `convergenceBound` and `termination` these are the
 certified facts; `AxiomCheck.Theorems` proves that they imply the claims'
 full meaning, `ConvergenceBoundHolds` and `TerminationHolds`. -/
 def ClaimHolds (c : Certificate) : Claim → Prop
   | .mass r => ∃ row, rowValues c r = some row ∧ MassHolds row
-  | .fixedPoint v => ∃ m, twoState c = some m ∧ FixedPointHolds m (Fraction.toRat v)
-  | .contraction f => ∃ m, twoState c = some m ∧ ContractionHolds m (SignedFraction.toRat f)
+  | .fixedPoint v =>
+    ∃ m, twoState c = some m ∧ RowsHold c ∧ m.a + m.b ≠ 0 ∧ FixedPointHolds m (Fraction.toRat v)
+  | .contraction f =>
+    ∃ m, twoState c = some m ∧ RowsHold c ∧ ContractionHolds m (SignedFraction.toRat f)
   | .convergenceBound start steps tolerance =>
-    ∃ m, twoState c = some m ∧ m.a + m.b ≠ 0 ∧ ratAbs m.lam ≤ 1 ∧
+    ∃ m, twoState c = some m ∧ RowsHold c ∧ m.a + m.b ≠ 0 ∧ ratAbs m.lam ≤ 1 ∧
       ConvergenceBoundCertified m (Fraction.toRat start) steps (Fraction.toRat tolerance)
   | .termination probability expected failure =>
     ∃ m, retryModel c = some m ∧ TerminationCertified m (Fraction.toRat probability)

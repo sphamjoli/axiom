@@ -37,15 +37,34 @@ def report (certificate : Certificate) : IO UInt32 := do
     allAccepted := allAccepted && accepted
   pure (if allAccepted then 0 else 1)
 
-/-- Reads the file at `path` unless it is larger than the certificate size
-limit or cannot be read. -/
+/-- Reads at most `remaining` more bytes from `handle` onto `acc`, stopping at
+the end of the file. Each read returns at least one byte unless the file has
+ended, so `fuel` reads always suffice when `fuel` exceeds `remaining`. -/
+def readUpTo (handle : IO.FS.Handle) : Nat → Nat → ByteArray → IO ByteArray
+  | 0, _, acc => pure acc
+  | fuel + 1, remaining, acc => do
+    if remaining == 0 then return acc
+    let chunk ← handle.read (USize.ofNat (min remaining 65536))
+    if chunk.isEmpty then return acc
+    readUpTo handle fuel (remaining - chunk.size) (acc ++ chunk)
+
+/-- Reads the file at `path` unless it is not a regular file, is larger than
+the certificate size limit, is not UTF-8, or cannot be read. The read goes
+through a handle capped at one byte past the limit, so a device or a file that
+grows after its size is checked cannot make the checker read without bound. -/
 def readBounded (path : System.FilePath) : IO (Except String String) := do
   try
     let metadata ← path.metadata
-    if metadata.byteSize.toNat > Parse.maxCertificateBytes then
-      pure (.error "certificate is too large")
-    else
-      pure (.ok (← IO.FS.readFile path))
+    if metadata.type != .file then
+      return .error "certificate is not a regular file"
+    let limit := Parse.maxCertificateBytes + 1
+    let bytes ← IO.FS.withFile path .read fun handle =>
+      readUpTo handle (limit + 1) limit ByteArray.empty
+    if bytes.size > Parse.maxCertificateBytes then
+      return .error "certificate is too large"
+    match String.fromUTF8? bytes with
+    | some text => pure (.ok text)
+    | none => pure (.error "certificate is not UTF-8")
   catch _ =>
     pure (.error "certificate cannot be read")
 

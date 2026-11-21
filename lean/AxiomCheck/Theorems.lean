@@ -260,7 +260,7 @@ theorem claimHolds_means (c : Certificate) (claim : Claim) (h : ClaimHolds c cla
   | fixedPoint v => exact h
   | contraction f => exact h
   | convergenceBound start steps tolerance =>
-    obtain ⟨m, hm, hab, hlam, hcert⟩ := h
+    obtain ⟨m, hm, _, hab, hlam, hcert⟩ := h
     exact ⟨m, hm, convergenceBound_holds m _ steps _ hab hlam hcert⟩
   | termination probability expected failure =>
     obtain ⟨m, hm, ⟨hp0, hp1⟩, hprob, hexp, hfail⟩ := h

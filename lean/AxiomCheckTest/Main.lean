@@ -5,8 +5,9 @@ import AxiomCheck
 
 Runs the strict JSON reader and the certificate reader against the shared
 fixtures in `fixtures/certificates/` and against reader-specific cases. Every
-rejection fixture must be rejected, except those whose fault is arithmetic:
-the reader accepts them structurally and the claim check rejects them. Exits with a non-zero status if any case fails.
+rejection fixture must be rejected for the reason `reject-reasons.tsv` gives:
+the reader's error, or `check` when its fault is arithmetic and the claim
+check rejects it. Exits with a non-zero status if any case fails.
 -/
 
 open AxiomCheck
@@ -15,16 +16,6 @@ namespace AxiomCheckTest
 
 /-- The shared certificate fixtures, relative to the `lean` directory. -/
 def fixtureDirectory : System.FilePath := ".." / "fixtures" / "certificates"
-
-/-- Rejection fixtures whose fault is checked by the claim checker, not the
-reader. -/
-def arithmeticFixtures : List String :=
-  [ "does-not-sum-to-one.json", "wrong-fixed-point.json", "wrong-contraction-factor.json"
-  , "contraction-factor-one.json", "periodic-contraction.json"
-  , "convergence-bound-too-few-steps.json", "periodic-convergence-bound.json"
-  , "identity-convergence-bound.json", "termination-wrong-expected-attempts.json"
-  , "termination-wrong-probability.json", "termination-expected-attempts-never-succeeds.json"
-  , "termination-wrong-failure-after.json" ]
 
 /-- The outcome of one test case: its name and, on failure, why. -/
 structure Outcome where
@@ -127,18 +118,31 @@ def goldenCases : IO (List Outcome) := do
          | .error _ => false)
         "version 2 golden file was not read as the link model" ]
 
-/-- One case per rejection fixture. -/
+/-- The checker's verdict on certificate text: the reader's error message,
+`check` when the reader accepts it and some claim fails, or `accepted`. -/
+def verdict (text : String) : String :=
+  match Parse.certificate text with
+  | .ok certificate => if Check.check certificate then "accepted" else "check"
+  | .error reason => reason
+
+/-- One case per rejection fixture, comparing the checker's verdict with the
+reason in `reject-reasons.tsv`, plus one case that the table names exactly the
+fixtures present. -/
 def rejectionCases : IO (List Outcome) := do
+  let table ← IO.FS.readFile (fixtureDirectory / "reject-reasons.tsv")
+  let expected := (table.splitOn "
+").filterMap fun line =>
+    match line.splitOn "	" with
+    | [name, _engine, reason] => some (name, reason)
+    | _ => none
   let entries ← (fixtureDirectory / "reject").readDir
   let names : List String := (entries.map (·.fileName)).toList.mergeSort (· ≤ ·)
-  names.mapM fun (name : String) => do
-    let text ← IO.FS.readFile (fixtureDirectory / "reject" / name)
-    let accepted := certificateAccepts text
-    if arithmeticFixtures.contains name then
-      pure (expect s!"reader accepts {name} structurally and the check rejects it"
-        (checks text == some false) "arithmetic fixture was not parsed and rejected")
-    else
-      pure (expect s!"rejects {name}" (!accepted) "accepted a rejection fixture")
+  let cases ← names.mapM fun (name : String) => do
+    let found := verdict (← IO.FS.readFile (fixtureDirectory / "reject" / name))
+    pure (expect s!"rejects {name} for its rule" (expected.lookup name == some found)
+      s!"verdict was {found}")
+  pure (expect "the reason table names exactly the rejection fixtures"
+    (expected.map Prod.fst == names) "reason table and fixtures differ" :: cases)
 
 /-- One case per acceptance fixture. -/
 def acceptanceCases : IO (List Outcome) := do
@@ -157,50 +161,24 @@ def goldenWithRow0 (row : List Fraction) : Certificate :=
 /-- The link model's rows. -/
 def linkRows : List (List Fraction) := [[⟨9, 10⟩, ⟨1, 10⟩], [⟨3, 10⟩, ⟨7, 10⟩]]
 
-/-- The periodic chain `a = b = 1`, which alternates between its states. -/
-def periodicRows : List (List Fraction) := [[⟨0, 1⟩, ⟨1, 1⟩], [⟨1, 1⟩, ⟨0, 1⟩]]
 
-/-- The chain `a = b = 0`, which never moves. -/
-def identityRows : List (List Fraction) := [[⟨1, 1⟩, ⟨0, 1⟩], [⟨0, 1⟩, ⟨1, 1⟩]]
-
-/-- Cases for the fixed point and contraction checks. -/
+/-- Checker cases for two-state claims that the fixtures do not cover. -/
 def twoStateCases : IO (List Outcome) := do
   let golden ← IO.FS.readFile (fixtureDirectory / "links-fixed-point.json")
   pure
     [ expect "checks the version 2 golden file" (checks golden == some true)
         "version 2 golden file did not check"
-    , expect "still checks the version 1 golden file"
-        (checks (← IO.FS.readFile (fixtureDirectory / "links-mass.json")) == some true)
-        "version 1 golden file did not check"
-    , expect "accepts steady state 1/4" (Check.check ⟨.chain linkRows, [.fixedPoint ⟨1, 4⟩]⟩)
-        "rejected 1/4"
-    , expect "rejects claimed steady state 3/10"
-        (!Check.check ⟨.chain linkRows, [.fixedPoint ⟨3, 10⟩]⟩) "accepted 3/10"
-    , expect "accepts factor 3/5" (Check.check ⟨.chain linkRows, [.contraction ⟨false, 3, 5⟩]⟩)
-        "rejected 3/5"
     , expect "rejects factor -3/5" (!Check.check ⟨.chain linkRows, [.contraction ⟨true, 3, 5⟩]⟩)
         "accepted -3/5"
-    , expect "rejects factor 1, which is not below one"
-        (!Check.check ⟨.chain identityRows, [.contraction ⟨false, 1, 1⟩]⟩) "accepted factor 1"
-    , expect "rejects the periodic chain's factor -1"
-        (!Check.check ⟨.chain periodicRows, [.contraction ⟨true, 1, 1⟩]⟩) "accepted factor -1"
-    , expect "accepts the periodic chain's steady state 1/2"
-        (Check.check ⟨.chain periodicRows, [.fixedPoint ⟨1, 2⟩]⟩) "rejected 1/2"
     , expect "rejects a two-state claim about a one-state model"
-        (!Check.check ⟨.chain [[⟨1, 1⟩]], [.fixedPoint ⟨1, 1⟩]⟩) "accepted a one-state model"
-    , expect "rejects a version 2 claim kind in version 1"
-        (!certificateAccepts
-          ((golden.replace "\"version\": 2" "\"version\": 1")))
-        "accepted FixedPoint in version 1" ]
+        (!Check.check ⟨.chain [[⟨1, 1⟩]], [.fixedPoint ⟨1, 1⟩]⟩) "accepted a one-state model" ]
 
-/-- Cases for the claim checker. -/
+/-- Checker cases for `Mass` claims at the boundaries of a row sum. -/
 def checkCases : IO (List Outcome) := do
   let golden ← IO.FS.readFile (fixtureDirectory / "links-mass.json")
-  let arithmetic ← IO.FS.readFile (fixtureDirectory / "reject" / "does-not-sum-to-one.json")
   pure
-    [ expect "checks the golden file" (checks golden == some true) "golden file did not check"
-    , expect "parses but rejects does-not-sum-to-one.json" (checks arithmetic == some false)
-        "arithmetic fixture was not parsed and rejected"
+    [ expect "checks the version 1 golden file" (checks golden == some true)
+        "golden file did not check"
     , expect "rejects a row summing to 999/1000"
         (!Check.check (goldenWithRow0 [⟨899, 1000⟩, ⟨1, 10⟩])) "accepted 999/1000"
     , expect "rejects a row summing to 1001/1000"
@@ -208,11 +186,10 @@ def checkCases : IO (List Outcome) := do
     , expect "rejects an entry above one"
         (!Check.check (goldenWithRow0 [⟨3, 2⟩, ⟨0, 1⟩])) "accepted 3/2"
     , expect "rejects a claim on a missing row"
-        (!Check.check ⟨.chain [[⟨1, 1⟩]], [.mass 1]⟩) "accepted a missing row"
-    , expect "accepts the unmutated golden model"
-        (Check.check (goldenWithRow0 [⟨9, 10⟩, ⟨1, 10⟩])) "rejected the golden model" ]
+        (!Check.check ⟨.chain [[⟨1, 1⟩]], [.mass 1]⟩) "accepted a missing row" ]
 
-/-- Evaluation cases for the semantics the theorems are about: the link model
+/-- Theorem smoke tests: evaluation cases for the semantics the theorems are
+about, the link model
 `a = 1/10`, `b = 3/10` and a retry loop with `p = 3/10`. -/
 def semanticsCases : List Outcome :=
   let link : Semantics.TwoState := ⟨1 / 10, 3 / 10⟩

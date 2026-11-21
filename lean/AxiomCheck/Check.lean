@@ -23,6 +23,17 @@ theorem checkRow_sound (row : List Rat) (h : checkRow row = true) : MassHolds ro
   simp only [Bool.and_eq_true, List.all_eq_true, decide_eq_true_eq] at h
   exact ⟨h.1, h.2⟩
 
+/-- Whether every row of the certificate's matrix is a probability
+distribution. -/
+def checkRows (c : Certificate) : Bool :=
+  c.rows.all fun row => checkRow (row.map Fraction.toRat)
+
+/-- A successful rows check implies `RowsHold`. -/
+theorem checkRows_sound (c : Certificate) (h : checkRows c = true) : RowsHold c := by
+  intro row hmem
+  unfold checkRows at h
+  exact checkRow_sound _ (List.all_eq_true.mp h row hmem)
+
 /-- Whether `value` is unchanged by the update `d' = λ d + c` of the
 two-state chain `m`. -/
 def checkFixedPoint (m : TwoState) (value : Rat) : Bool :=
@@ -97,15 +108,17 @@ def checkClaim (c : Certificate) : Claim → Bool
     | none => false
   | .fixedPoint v =>
     match twoState c with
-    | some m => checkFixedPoint m (Fraction.toRat v)
+    | some m =>
+      checkRows c && decide (m.a + m.b ≠ 0) && checkFixedPoint m (Fraction.toRat v)
     | none => false
   | .contraction f =>
     match twoState c with
-    | some m => checkContraction m (SignedFraction.toRat f)
+    | some m => checkRows c && checkContraction m (SignedFraction.toRat f)
     | none => false
   | .convergenceBound start steps tolerance =>
     match twoState c with
-    | some m => checkConvergenceBound m (Fraction.toRat start) steps (Fraction.toRat tolerance)
+    | some m =>
+      checkRows c && checkConvergenceBound m (Fraction.toRat start) steps (Fraction.toRat tolerance)
     | none => false
   | .termination probability expected failure =>
     match retryModel c with
@@ -137,7 +150,8 @@ theorem checkClaim_sound (c : Certificate) (claim : Claim) (h : checkClaim c cla
     cases hm : twoState c with
     | some m =>
       rw [hm] at h
-      exact ⟨m, rfl, checkFixedPoint_sound m (Fraction.toRat v) h⟩
+      simp only [Bool.and_eq_true, decide_eq_true_eq] at h
+      exact ⟨m, rfl, checkRows_sound c h.1.1, h.1.2, checkFixedPoint_sound m _ h.2⟩
     | none =>
       rw [hm] at h
       exact absurd h Bool.false_ne_true
@@ -147,7 +161,8 @@ theorem checkClaim_sound (c : Certificate) (claim : Claim) (h : checkClaim c cla
     cases hm : twoState c with
     | some m =>
       rw [hm] at h
-      exact ⟨m, rfl, checkContraction_sound m (SignedFraction.toRat f) h⟩
+      simp only [Bool.and_eq_true] at h
+      exact ⟨m, rfl, checkRows_sound c h.1, checkContraction_sound m _ h.2⟩
     | none =>
       rw [hm] at h
       exact absurd h Bool.false_ne_true
@@ -157,7 +172,8 @@ theorem checkClaim_sound (c : Certificate) (claim : Claim) (h : checkClaim c cla
     cases hm : twoState c with
     | some m =>
       rw [hm] at h
-      exact ⟨m, rfl, checkConvergenceBound_sound m _ steps _ h⟩
+      simp only [Bool.and_eq_true] at h
+      exact ⟨m, rfl, checkRows_sound c h.1, checkConvergenceBound_sound m _ steps _ h.2⟩
     | none =>
       rw [hm] at h
       exact absurd h Bool.false_ne_true

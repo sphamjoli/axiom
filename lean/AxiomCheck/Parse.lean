@@ -11,13 +11,15 @@ the version 1, 2 and 3 formats: size, JSON syntax and fields, `format`,
 has exactly two states. Version 3 adds the `ConvergenceBound` claim kind for
 two-state chains, the retry model `{"retry": {"success": p}}` as an
 alternative to `{"rows": ...}`, and the `Termination` claim kind for retry
-models; step and attempt counts are capped at `maxCount`. It accepts the same
-certificates as the engine's reader, except that it leaves the arithmetic of
-claims to the claim check: the sum of each row, and whether a fixed point or
-contraction factor is correct, and whether a convergence bound or termination
-claim holds. The two readers may report a different first
-error for the same invalid certificate.
-Whether each claim holds is checked by the checker, not here. Error messages report positions and counts, never certificate text.
+models; step and attempt counts are capped at `maxCount`.
+
+The reader leaves the arithmetic of claims to the claim check: the sum of each
+row, and whether a fixed point, contraction factor, convergence bound or
+termination claim holds. A certificate is valid when this reader accepts it
+and every claim checks; the engine's reader does both at once. The shared
+fixtures in `fixtures/certificates/`, each with the rule it breaks, test that
+the two agree on every case they cover; agreement is not proved. Error
+messages report positions and counts, never certificate text.
 -/
 
 namespace AxiomCheck.Parse
@@ -32,9 +34,6 @@ def maxStates : Nat := 16
 
 /-- The longest numerator or denominator, in decimal digits. -/
 def maxFractionDigits : Nat := 64
-
-/-- The largest row index the format can express. -/
-def maxRowIndex : Nat := 2 ^ 64 - 1
 
 /-- The largest step count of a `ConvergenceBound` claim and attempt count of
 a `Termination` claim's `failure_after`. It bounds the size of the powers the
@@ -172,7 +171,7 @@ def claim (version : Nat) (model : Model) (value : Value) : Except String Claim 
     let .chain rows := model | .error "claim kind needs a chain model"
     let members ← exactMembers ["kind", "row"] value
     let (.nat row) ← field members "row" | .error "row must be an integer"
-    if row > maxRowIndex || row ≥ rows.length then .error "claim refers to a missing row"
+    if row ≥ rows.length then .error "claim refers to a missing row"
     else pure (.mass row)
   | "FixedPoint" =>
     requireTwoState 2 version model
