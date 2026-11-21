@@ -20,7 +20,7 @@ A checker built on it would therefore accept certificates that the engine's read
 
 ## Decision drivers
 
-- The engine's reader and the checker's reader must accept exactly the same certificates and read the same values from them.
+- The engine's reader and the checker's reader must accept the same certificates and read the same values from them. The one exception is arithmetic: whether a row sums to one is the content of a Mass claim, which the checker decides after reading.
 - The code in the trusted computing base must be small enough to review line by line.
 - The reader must terminate on every input and bound its work, because certificates come from an untrusted engine.
 - Agreement between the two readers must be tested, not assumed.
@@ -36,7 +36,7 @@ A checker built on it would therefore accept certificates that the engine's read
 
 Option 3. `AxiomCheck.Json` is a strict reader for objects, arrays, strings and non-negative integers written as plain decimal digits. Objects keep every key, in order, including repeats. `true`, `false`, `null`, signs, fractions, exponents, leading zeros, integers longer than 20 digits, a byte order mark, trailing data, unescaped control characters and lone surrogates are rejected. Nesting is limited to eight levels, objects to eight members and arrays to 64 items, and every recursive call either consumes input or descends a level, so the reader terminates on every input. The member and item limits are well above what a certificate needs (four keys, 16 items) and keep the interpreter's recursion shallow: an early version without them overflowed the stack on a 40 KB object with 5,000 members.
 
-`AxiomCheck.Parse.certificate` turns the reader's output into a `Certificate`, enforcing the rules of ADR-001 in the same order as the engine's reader: size, then JSON syntax and fields, `format`, `version`, matrix shape, fractions, and claims. Whether each row sums to one is the content of a Mass claim, so it is left to the claim check and is not a reading rule.
+`AxiomCheck.Parse.certificate` turns the reader's output into a `Certificate`, enforcing the rules of ADR-001: size, then JSON syntax and fields, `format`, `version`, matrix shape, fractions, and claims. The two readers accept the same certificates but may report a different first error for an invalid one, because the engine's JSON library checks field types while parsing. Whether each row sums to one is the content of a Mass claim, so it is left to the claim check and is not a reading rule.
 
 Both readers are tested against the same files in `fixtures/certificates/`: the golden certificate must be read as the link model, every file in `accept/` must be accepted, and every file in `reject/` must be rejected, except the one whose fault is arithmetic, which the reader accepts and the claim check must reject. The acceptance fixtures pin behaviour the two readers must share, such as escaped keys and digits, and whitespace and key order.
 
