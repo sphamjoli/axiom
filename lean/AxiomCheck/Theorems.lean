@@ -1,4 +1,4 @@
-import AxiomCheck.Semantics
+import AxiomCheck.Check
 import Mathlib.Algebra.Order.Field.Basic
 import Mathlib.Algebra.BigOperators.Fin
 import Mathlib.Tactic.Linarith
@@ -24,6 +24,8 @@ definitions they are about.
 * Retry termination: the closed-form success probability is the least fixed
   point, and the expected attempts and failure probabilities have their
   closed forms.
+* Full soundness: if the checker accepts a certificate, every claim holds in
+  its full meaning, including `ConvergenceBoundHolds` and `TerminationHolds`.
 -/
 
 namespace AxiomCheck.Semantics
@@ -230,5 +232,55 @@ theorem Retry.failureAfter_eq (m : Retry) (k : ℕ) :
     rw [Retry.successWithin, pow_succ, ← ih]
     unfold Retry.map
     ring
+
+/-! ## Full soundness of the checker -/
+
+/-- The full meaning of a claim: for `convergenceBound`, every iterate from
+step `steps` on is within `tolerance` of the stationary probability; for
+`termination`, `probability` is the least fixed point of the retry equation,
+the expected attempts solve `E = 1 + (1 - p) E` with `p > 0`, and the failure
+probability is that of the first `k` attempts all failing. The other kinds
+mean what `ClaimHolds` says. -/
+def ClaimMeans (c : Certificate) : Claim → Prop
+  | .convergenceBound start steps tolerance =>
+    ∃ m, twoState c = some m ∧
+      ConvergenceBoundHolds m (Fraction.toRat start) steps (Fraction.toRat tolerance)
+  | .termination probability expected failure =>
+    ∃ m, retryModel c = some m ∧ TerminationHolds m (Fraction.toRat probability) ∧
+      (∀ e, expected = some e → 0 < m.p ∧ Fraction.toRat e = m.expectedAttempts ∧
+        m.expectedAttempts = 1 + (1 - m.p) * m.expectedAttempts) ∧
+      (∀ k q, failure = some (k, q) → Fraction.toRat q = m.failureAfter k)
+  | claim => ClaimHolds c claim
+
+/-- The certified facts of a claim imply its full meaning. -/
+theorem claimHolds_means (c : Certificate) (claim : Claim) (h : ClaimHolds c claim) :
+    ClaimMeans c claim := by
+  cases claim with
+  | mass r => exact h
+  | fixedPoint v => exact h
+  | contraction f => exact h
+  | convergenceBound start steps tolerance =>
+    obtain ⟨m, hm, hab, hlam, hcert⟩ := h
+    exact ⟨m, hm, convergenceBound_holds m _ steps _ hab hlam hcert⟩
+  | termination probability expected failure =>
+    obtain ⟨m, hm, ⟨hp0, hp1⟩, hprob, hexp, hfail⟩ := h
+    refine ⟨m, hm, ?_, ?_, ?_⟩
+    · rw [hprob]
+      exact m.termination_holds hp0 hp1
+    · intro e he
+      have hsome : expected.map Fraction.toRat = some (Fraction.toRat e) := by rw [he]; rfl
+      obtain ⟨hne, heq⟩ := hexp _ hsome
+      have hpos : 0 < m.p := lt_of_le_of_ne hp0 (Ne.symm hne)
+      exact ⟨hpos, heq, m.expectedAttempts_equation hpos⟩
+    · intro k q hf
+      have hsome : failureToRat failure = some (k, Fraction.toRat q) := by
+        rw [hf]; rfl
+      rw [hfail k _ hsome, m.failureAfter_eq]
+
+/-- Full soundness: if the checker accepts a certificate, every claim holds in
+its full meaning. -/
+theorem check_sound_full (c : Certificate) (h : Check.check c = true) :
+    ∀ claim ∈ c.claims, ClaimMeans c claim :=
+  fun claim hmem => claimHolds_means c claim (Check.check_sound c h claim hmem)
 
 end AxiomCheck.Semantics
