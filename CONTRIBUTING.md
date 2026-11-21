@@ -1,6 +1,6 @@
 # Contributing to axiom
 
-This guide covers everything needed to build, check and change the repository: the tools to install, the commands to run, the layout of the code, and the rules for commits and pull requests. The project itself is described in [README.md](README.md). It is a proof of concept, and at present the repository contains workspace configuration only.
+This guide covers everything needed to build, check and change the repository: the tools to install, the commands to run, the layout of the code, and the rules for commits and pull requests. The project itself is described in [README.md](README.md). It is a proof of concept.
 
 ## Prerequisites
 
