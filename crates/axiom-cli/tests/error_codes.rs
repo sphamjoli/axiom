@@ -83,7 +83,7 @@ fn expected_reports() -> Vec<(String, Outcome)> {
             Refused,
         ),
         (
-            "axiom: parametric-chain: parametric chains are not yet supported: no claim kind covers them",
+            "axiom: parametric-chain: parametric chain is not a two-state chain whose exits are its two parameters",
             Refused,
         ),
         (
@@ -267,7 +267,7 @@ fn every_reason_the_lean_reader_prints_names_a_rule() -> Result<(), TestError> {
         }
         let line = match reason.as_str() {
             "claim kind needs certificate version {needed}" => {
-                for needed in ["2", "3"] {
+                for needed in ["2", "3", "4"] {
                     let line = format!("claim kind needs certificate version {needed}");
                     ensure(CheckerRule::from_line(&line).is_some(), &line)?;
                 }

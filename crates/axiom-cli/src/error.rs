@@ -201,8 +201,10 @@ pub enum CliError {
     /// The model was rejected by the parser or the static checks.
     #[error(transparent)]
     Model(#[from] ModelError),
-    /// The model is a chain with parameters, for which no claim kind exists.
-    #[error("parametric chains are not yet supported: no claim kind covers them")]
+    /// The model is a chain with parameters that is not a two-state chain
+    /// whose exit probabilities are exactly its two parameters, the only
+    /// parametric shape a claim kind covers.
+    #[error("parametric chain is not a two-state chain whose exits are its two parameters")]
     ParametricChain,
     /// The model is a retry loop with parameters, for which no claim kind
     /// exists.

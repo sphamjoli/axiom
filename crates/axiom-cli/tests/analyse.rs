@@ -9,52 +9,57 @@ use std::process::{Command, Output};
 
 use common::{TestError, axiom, ensure, repo_root, scratch};
 
-#[test]
-fn reproduces_golden_certificate() -> Result<(), TestError> {
-    let dir = scratch("golden")?;
-    let out = dir.join("links-convergence.json");
-    let model = repo_root().join("fixtures/models/links.axm");
-    let output = axiom(&[
+/// Runs `axiom analyse` on `model` from the repository's fixtures with
+/// `extra` arguments, and checks that it writes the golden certificate
+/// `golden` byte for byte and prints `summary`.
+fn reproduces(model: &str, extra: &[&str], golden: &str, summary: &str) -> Result<(), TestError> {
+    let dir = scratch(golden)?;
+    let out = dir.join(golden);
+    let model = repo_root().join("fixtures/models").join(model);
+    let mut args = vec![
         OsStr::new("analyse"),
         model.as_os_str(),
         OsStr::new("--cert"),
         out.as_os_str(),
-    ])?;
-    ensure(output.status.code() == Some(0), "analyse failed")?;
-    let written = std::fs::read(&out)?;
-    let golden = std::fs::read(repo_root().join("fixtures/certificates/links-convergence.json"))?;
+    ];
+    args.extend(extra.iter().map(OsStr::new));
+    let output = axiom(&args)?;
     ensure(
-        written == golden,
-        "certificate differs from the golden file",
+        output.status.code() == Some(0),
+        format!("{golden}: analyse failed"),
+    )?;
+    let written = std::fs::read(&out)?;
+    let expected = std::fs::read(repo_root().join("fixtures/certificates").join(golden))?;
+    ensure(
+        written == expected,
+        format!("{golden}: certificate differs from the golden file"),
     )?;
     let stdout = String::from_utf8_lossy(&output.stdout);
     ensure(
-        stdout.contains("2 states") && stdout.contains("2 rows"),
-        "summary lacks the state and row counts",
+        stdout.contains(summary),
+        format!("{golden}: summary: {stdout}"),
     )
 }
 
 #[test]
-fn reproduces_retry_golden_certificate() -> Result<(), TestError> {
-    let dir = scratch("retry-golden")?;
-    let out = dir.join("retry-termination.json");
-    let model = repo_root().join("fixtures/models/retry.axm");
-    let output = axiom(&[
-        OsStr::new("analyse"),
-        model.as_os_str(),
-        OsStr::new("--cert"),
-        out.as_os_str(),
-    ])?;
-    ensure(output.status.code() == Some(0), "analyse failed")?;
-    let written = std::fs::read(&out)?;
-    let golden = std::fs::read(repo_root().join("fixtures/certificates/retry-termination.json"))?;
-    ensure(
-        written == golden,
-        "certificate differs from the golden file",
+fn reproduces_the_golden_certificates() -> Result<(), TestError> {
+    reproduces(
+        "links.axm",
+        &[],
+        "links-convergence.json",
+        "chain links: 2 states, 2 rows; wrote 5 claims",
     )?;
-    ensure(
-        String::from_utf8_lossy(&output.stdout).contains("retry request: wrote 1 claims"),
-        "summary does not describe the retry",
+    reproduces(
+        "retry.axm",
+        &[],
+        "retry-termination.json",
+        "retry request: wrote 1 claims",
+    )?;
+    reproduces(
+        "links-param.axm",
+        &[],
+        "links-param.json",
+        "parametric chain links: wrote 1 claims",
     )
 }
 
@@ -121,25 +126,49 @@ fn the_same_failure_prints_the_same_bytes_from_any_directory() -> Result<(), Tes
 }
 
 #[test]
-fn rejects_unsupported_models() -> Result<(), TestError> {
+fn refuses_parametric_models_no_claim_covers() -> Result<(), TestError> {
     let dir = scratch("unsupported")?;
     let out = dir.join("out.json");
-    let retry_param = dir.join("retry-param.axm");
-    std::fs::write(
-        &retry_param,
-        "param p in ]0, 1[\nretry request {\n  success p\n}\n",
-    )?;
-    let links_param = repo_root().join("fixtures/models/links-param.axm");
-    for (model, code) in [
-        (links_param, "axiom: parametric-chain: "),
-        (retry_param, "axiom: parametric-retry: "),
-    ] {
+    let links = |a: &str, b: &str| {
+        format!(
+            "param a in {a}\nparam b in {b}\nchain links {{\n  states up, down\n  from up:   up 1 - a, down a\n  from down: up b, down 1 - b\n}}\n"
+        )
+    };
+    let cases = [
+        (
+            "retry-param.axm",
+            "param p in ]0, 1[\nretry request {\n  success p\n}\n".to_owned(),
+            "axiom: parametric-retry: ",
+        ),
+        (
+            "half-exit.axm",
+            "param a in ]0, 1[\nparam b in ]0, 1[\nchain links {\n  states up, down\n  from up:   up 1 - 1/2*a, down 1/2*a\n  from down: up b, down 1 - b\n}\n".to_owned(),
+            "axiom: parametric-chain: ",
+        ),
+        (
+            "reaches-two.axm",
+            links("]0, 1]", "]0, 1]"),
+            "axiom: no-parametric-contraction: ",
+        ),
+        (
+            "reaches-zero.axm",
+            links("[0, 1[", "[0, 1["),
+            "axiom: no-parametric-contraction: ",
+        ),
+    ];
+    for (name, source, code) in cases {
+        let model = dir.join(name);
+        std::fs::write(&model, source)?;
         let output = analyse_in(&dir, &model, &out)?;
-        ensure(output.status.code() == Some(2), "expected exit status 2")?;
+        ensure(
+            output.status.code() == Some(2),
+            format!("{name}: expected exit status 2"),
+        )?;
         ensure(
             String::from_utf8_lossy(&output.stderr).starts_with(code),
-            format!("{code}: missing"),
+            format!("{name}: {}", String::from_utf8_lossy(&output.stderr)),
         )?;
+        ensure(!out.exists(), format!("{name}: a certificate was written"))?;
     }
     Ok(())
 }

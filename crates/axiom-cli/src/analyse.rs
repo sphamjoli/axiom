@@ -5,61 +5,70 @@ use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 
-use axiom_cert::Certificate;
-use axiom_core::TransitionMatrix;
-use axiom_model::{CheckedModel, MAX_INPUT_BYTES};
+use axiom_cert::{Certificate, End, Interval};
+use axiom_core::Probability;
+use axiom_model::{AffineWeight, Bound, Chain, CheckedModel, MAX_INPUT_BYTES, Parameter};
+use num_traits::{One, Zero};
 
 use crate::error::{CliError, FileRole, IoFailure};
 
 /// What `analyse` wrote, for the summary line.
 #[derive(Debug)]
 pub struct Summary {
-    name: String,
-    states: Option<usize>,
+    /// The model's description, ending with its separator: `chain links: 2
+    /// states, 2 rows;`, `parametric chain links:` or `retry request:`.
+    model: String,
     claims: usize,
     cert: String,
 }
 
 impl fmt::Display for Summary {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.states {
-            Some(states) => write!(
-                formatter,
-                "chain {}: {states} states, {states} rows; wrote {} claims to {}",
-                self.name, self.claims, self.cert
-            ),
-            None => write!(
-                formatter,
-                "retry {}: wrote {} claims to {}",
-                self.name, self.claims, self.cert
-            ),
-        }
+        write!(
+            formatter,
+            "{} wrote {} claims to {}",
+            self.model, self.claims, self.cert
+        )
     }
 }
 
 /// The attempt count of the `failure_after` part of a `Termination` claim.
 const FAILURE_ATTEMPTS: u64 = 20;
 
-/// Reads the model at `model` and, for a model without parameters, writes a
-/// certificate to `cert`: for a chain, a `Mass` claim for every row, plus
-/// `FixedPoint`, `Contraction` and `ConvergenceBound` claims when the chain
-/// has two states and settles; for a retry loop, a `Termination` claim.
+/// Reads the model at `model` and writes a certificate to `cert`: for a
+/// chain, a `Mass` claim for every row, plus `FixedPoint`, `Contraction` and
+/// `ConvergenceBound` claims when the chain has two states and settles; for
+/// a two-state chain whose exit probabilities are its two parameters, a
+/// `ParametricContraction` claim; for a retry loop, a `Termination` claim.
 ///
 /// # Errors
 ///
-/// Returns an error when the model cannot be read, is invalid or has
-/// parameters, or when the certificate cannot be written.
+/// Returns an error when the model cannot be read or is invalid, when it is
+/// a parametric retry or a parametric chain of another shape, when a
+/// parametric range includes a chain that does not contract, or when the
+/// certificate cannot be written.
 pub fn run(model: &Path, cert: &Path) -> Result<Summary, CliError> {
     let source = read_model(model)?;
-    let (name, certificate) = match axiom_model::parse(&source)? {
+    let (description, certificate) = match axiom_model::parse(&source)? {
         CheckedModel::Chain(chain) => {
-            let matrix = chain.matrix.ok_or(CliError::ParametricChain)?;
-            (chain.name, Certificate::strongest(matrix))
+            if let Some(matrix) = &chain.matrix {
+                let states = matrix.states();
+                (
+                    format!("chain {}: {states} states, {states} rows;", chain.name),
+                    Certificate::strongest(matrix.clone()),
+                )
+            } else {
+                let (a, b) = parametric_ranges(&chain).ok_or(CliError::ParametricChain)?;
+                (
+                    format!("parametric chain {}:", chain.name),
+                    Certificate::parametric(a, b)?,
+                )
+            }
         }
         CheckedModel::Retry(retry) => {
             let success = retry.probability.ok_or(CliError::ParametricRetry)?;
             (
-                retry.name,
+                format!("retry {}:", retry.name),
                 Certificate::termination(success, FAILURE_ATTEMPTS)?,
             )
         }
@@ -70,11 +79,59 @@ pub fn run(model: &Path, cert: &Path) -> Result<Summary, CliError> {
         failure: IoFailure::from(&error),
     })?;
     Ok(Summary {
-        name,
-        states: certificate.matrix().map(TransitionMatrix::states),
+        model: description,
         claims: certificate.claims().len(),
         cert: cert.display().to_string(),
     })
+}
+
+/// The ranges of `a` and `b` for a two-state chain whose exit
+/// probabilities are exactly two distinct parameters, `a` from the first
+/// state and `b` from the second, or `None` for any other parametric chain.
+/// The diagonal needs no check: the model checker has shown that every row
+/// sums to one.
+fn parametric_ranges(chain: &Chain) -> Option<(Interval, Interval)> {
+    let [first, second] = chain.rows.as_slice() else {
+        return None;
+    };
+    let a = sole_parameter(first.get(1)?)?;
+    let b = sole_parameter(second.first()?)?;
+    if a == b || chain.parameters.len() != 2 {
+        return None;
+    }
+    Some((
+        interval(chain.parameters.get(a)?)?,
+        interval(chain.parameters.get(b)?)?,
+    ))
+}
+
+/// The index of the parameter a weight is exactly equal to, if any.
+fn sole_parameter(weight: &AffineWeight) -> Option<usize> {
+    if !weight.constant().is_zero() {
+        return None;
+    }
+    let mut found = None;
+    for (index, coefficient) in weight.coefficients().iter().enumerate() {
+        if coefficient.is_one() && found.is_none() {
+            found = Some(index);
+        } else if !coefficient.is_zero() {
+            return None;
+        }
+    }
+    found
+}
+
+/// A parameter's range as a certificate interval.
+fn interval(parameter: &Parameter) -> Option<Interval> {
+    let end = |bound: &Bound| if bound.closed { End::Closed } else { End::Open };
+    let probability = |bound: &Bound| Probability::try_new(&bound.value).ok();
+    Interval::try_new(
+        probability(&parameter.lower)?,
+        end(&parameter.lower),
+        probability(&parameter.upper)?,
+        end(&parameter.upper),
+    )
+    .ok()
 }
 
 /// Reads a model file, refusing files larger than the model size limit

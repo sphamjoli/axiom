@@ -36,6 +36,7 @@ dependencies = [
  "axiom-core",
  "axiom-model",
  "clap",
+ "num-traits",
  "thiserror",
 ]
 

@@ -267,8 +267,8 @@ fn parse_output(stdout: &str) -> Result<Output<'_>, CliError> {
 }
 
 /// Whether `text` has the form `claim <n> Mass row <r>` or `claim <n> <kind>`
-/// for one of the kinds `FixedPoint`, `Contraction`, `ConvergenceBound`
-/// and `Termination`.
+/// for one of the kinds `FixedPoint`, `Contraction`, `ConvergenceBound`,
+/// `Termination` and `ParametricContraction`.
 fn is_claim(text: &str) -> bool {
     let words: Vec<&str> = text.split(' ').collect();
     let number = |word: &str| !word.is_empty() && word.bytes().all(|b| b.is_ascii_digit());
@@ -277,7 +277,11 @@ fn is_claim(text: &str) -> bool {
         [
             "claim",
             index,
-            "FixedPoint" | "Contraction" | "ConvergenceBound" | "Termination",
+            "FixedPoint"
+            | "Contraction"
+            | "ConvergenceBound"
+            | "Termination"
+            | "ParametricContraction",
         ] => number(index),
         _ => false,
     }

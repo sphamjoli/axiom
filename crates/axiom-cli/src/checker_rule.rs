@@ -25,7 +25,7 @@ enum Layer {
 
 /// The checker's reading rules: the text it prints, the layer it prints it
 /// in, and the code `axiom check` reports.
-const RULES: [(&str, Layer, &str); 52] = [
+const RULES: [(&str, Layer, &str); 57] = [
     (
         "unexpected character",
         Layer::Json,
@@ -171,7 +171,7 @@ const RULES: [(&str, Layer, &str); 52] = [
         "checker-matrix-not-square",
     ),
     (
-        "model must have exactly one of rows and retry",
+        "model must have exactly one of rows, retry and parametric",
         Layer::Format,
         "checker-model-form",
     ),
@@ -180,6 +180,17 @@ const RULES: [(&str, Layer, &str); 52] = [
         Layer::Format,
         "checker-retry-needs-version",
     ),
+    (
+        "parametric model needs certificate version 4",
+        Layer::Format,
+        "checker-parametric-needs-version",
+    ),
+    (
+        "interval end must be open or closed",
+        Layer::Format,
+        "checker-interval-end",
+    ),
+    ("interval is empty", Layer::Format, "checker-empty-interval"),
     (
         "certificate makes no claims",
         Layer::Format,
@@ -209,6 +220,16 @@ const RULES: [(&str, Layer, &str); 52] = [
         "claim kind needs certificate version 3",
         Layer::Format,
         "checker-claim-needs-version-3",
+    ),
+    (
+        "claim kind needs certificate version 4",
+        Layer::Format,
+        "checker-claim-needs-version-4",
+    ),
+    (
+        "claim kind needs a parametric model",
+        Layer::Format,
+        "checker-not-parametric",
     ),
     (
         "claim kind needs a chain model",
