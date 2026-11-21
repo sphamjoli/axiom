@@ -1,24 +1,20 @@
 //! The `axiom` command line.
 //!
 //! `axiom analyse <model.axm> --cert <out.json>` reads a model and, for a
-//! chain without parameters, writes a certificate with a `Mass` claim for
-//! every row. `axiom check <cert.json>` runs the Lean checker on a
+//! model without parameters, writes a certificate of the strongest claims the
+//! engine can make about it. `axiom check <cert.json>` runs the Lean checker on a
 //! certificate and reports the verdict on each claim.
 //!
 //! Exit status: 0 when the command succeeded and, for `check`, every claim
 //! was accepted; 1 when `check` found a rejected claim; 2 for a usage error,
 //! an unreadable or invalid input, an unsupported model or a checker that
-//! could not be run.
-
-mod analyse;
-mod check;
-mod cli;
-mod error;
+//! could not be run; 3 when the checker ran longer than its limit.
 
 use std::process::ExitCode;
 
-use cli::Command;
-use error::CliError;
+use axiom_cli::cli::{self, Command};
+use axiom_cli::error::CliError;
+use axiom_cli::{analyse, check};
 
 /// The exit status when every claim was accepted or the command succeeded.
 const EXIT_OK: u8 = 0;
@@ -26,6 +22,8 @@ const EXIT_OK: u8 = 0;
 const EXIT_REJECTED: u8 = 1;
 /// The exit status for usage and input errors.
 const EXIT_ERROR: u8 = 2;
+/// The exit status when the checker ran longer than its limit.
+const EXIT_TIMEOUT: u8 = 3;
 
 fn main() -> ExitCode {
     let arguments: Vec<_> = std::env::args_os().skip(1).collect();
@@ -36,7 +34,11 @@ fn main() -> ExitCode {
             if matches!(error, CliError::Usage(_)) {
                 eprintln!("{}", cli::USAGE);
             }
-            ExitCode::from(EXIT_ERROR)
+            ExitCode::from(if matches!(error, CliError::LeanTimeout { .. }) {
+                EXIT_TIMEOUT
+            } else {
+                EXIT_ERROR
+            })
         }
     }
 }

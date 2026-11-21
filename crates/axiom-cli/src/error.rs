@@ -8,7 +8,8 @@ use axiom_cert::CertificateError;
 use axiom_model::ModelError;
 use thiserror::Error;
 
-/// A failure that ends a command with exit status 2.
+/// A failure that ends a command: with exit status 3 for
+/// [`CliError::LeanTimeout`] and exit status 2 for every other variant.
 #[derive(Debug, Error)]
 pub enum CliError {
     /// The arguments do not form a valid command.
@@ -62,6 +63,12 @@ pub enum CliError {
         dir: PathBuf,
         /// The underlying failure.
         source: std::io::Error,
+    },
+    /// The Lean checker ran longer than its wall-clock limit and was killed.
+    #[error("Lean checker: killed after the limit of {seconds} s")]
+    LeanTimeout {
+        /// The limit in seconds.
+        seconds: u64,
     },
     /// The Lean checker reported an error or produced unexpected output.
     #[error("Lean checker: {0}")]

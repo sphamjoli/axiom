@@ -54,14 +54,20 @@ pub fn axiom(args: &[&std::ffi::OsStr]) -> Result<Output, TestError> {
 }
 
 /// Whether `lake` can be run. When it cannot, prints why the calling test is
-/// skipped.
-pub fn lake_available(test: &str) -> bool {
+/// skipped, or fails when the `CI` environment variable is set, so a CI job
+/// never passes these tests by skipping them.
+pub fn lake_available(test: &str) -> Result<bool, TestError> {
     let found = Command::new("lake")
         .arg("--version")
         .output()
         .is_ok_and(|output| output.status.success());
     if !found {
+        if std::env::var_os("CI").is_some() {
+            return Err(TestError::Unexpected(format!(
+                "{test}: lake is not on PATH and CI is set"
+            )));
+        }
         eprintln!("skipping {test}: lake is not on PATH, so the Lean checker cannot run");
     }
-    found
+    Ok(found)
 }

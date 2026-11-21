@@ -44,6 +44,11 @@ const FAILURE_ATTEMPTS: u64 = 20;
 /// certificate to `cert`: for a chain, a `Mass` claim for every row, plus
 /// `FixedPoint`, `Contraction` and `ConvergenceBound` claims when the chain
 /// has two states and settles; for a retry loop, a `Termination` claim.
+///
+/// # Errors
+///
+/// Returns an error when the model cannot be read, is invalid or has
+/// parameters, or when the certificate cannot be written.
 pub fn run(model: &Path, cert: &Path) -> Result<Summary, CliError> {
     let source = read_model(model)?;
     let checked = axiom_model::parse(&source).map_err(|source| CliError::Model {

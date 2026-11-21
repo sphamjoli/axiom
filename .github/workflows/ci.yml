@@ -40,7 +40,8 @@ jobs:
       - name: Clippy
         run: make rust-lint
       - name: Tests
-        run: make rust-test
+        # The tests that run the Lean checker need lake; the lean job runs them.
+        run: make rust-test-without-lean
 
   docs:
     name: rustdoc
@@ -73,6 +74,8 @@ jobs:
         run: ./scripts/testLean.sh
       - name: Kernel axiom audit
         run: ./scripts/checkLeanAxioms.sh
+      - name: axiom check through the Lean checker
+        run: make cli-lean-test
 
   gates:
     name: source gates

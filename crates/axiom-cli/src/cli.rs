@@ -12,7 +12,12 @@ pub const USAGE: &str = "usage:
   axiom help
 
 exit status: 0 success or every claim accepted, 1 some claim rejected,
-2 usage or input error";
+2 usage or input error, 3 checker killed after its time limit
+
+environment:
+  AXIOM_LEAN_DIR            Lean project whose checker code runs; defaults to
+                            the source tree the binary was built from
+  AXIOM_CHECK_TIMEOUT_SECS  checker wall-clock limit in seconds (default 60)";
 
 /// A parsed command.
 #[derive(Debug, PartialEq, Eq)]
@@ -34,6 +39,10 @@ pub enum Command {
 }
 
 /// Parses the arguments that follow the program name.
+///
+/// # Errors
+///
+/// Returns [`CliError::Usage`] when the arguments do not form a command.
 pub fn parse(arguments: &[OsString]) -> Result<Command, CliError> {
     let Some((command, rest)) = arguments.split_first() else {
         return Err(CliError::Usage("missing command"));

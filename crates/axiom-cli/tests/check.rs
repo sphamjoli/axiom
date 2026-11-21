@@ -1,11 +1,15 @@
-//! End-to-end tests of `axiom check` through the Lean checker. Each test is
-//! skipped, with a message, when `lake` is not on PATH.
+//! End-to-end tests of `axiom check`: exit codes and output through the real
+//! Lean checker, and the time limit through a stand-in for `lake`. Which
+//! certificates the checker accepts is tested by the Lean checker's own tests
+//! against the shared fixtures, and output parsing in `output.rs`. The tests
+//! that need Lean, named `lean_*`, are skipped when `lake` is not on PATH,
+//! unless `CI` is set, when they fail instead; CI runs them in the Lean job.
 
 mod common;
 
 use std::ffi::OsStr;
 use std::path::Path;
-use std::process::Output;
+use std::process::{Command, Output};
 
 use common::{TestError, axiom, ensure, lake_available, repo_root, scratch};
 
@@ -14,70 +18,38 @@ fn check(cert: &Path) -> Result<Output, TestError> {
 }
 
 #[test]
-fn accepts_golden_certificate() -> Result<(), TestError> {
-    if !lake_available("accepts_golden_certificate") {
+fn lean_accepted_certificate_exits_zero_with_verdicts_and_timing() -> Result<(), TestError> {
+    if !lake_available("lean_accepted_certificate_exits_zero_with_verdicts_and_timing")? {
         return Ok(());
     }
-    let output = check(&repo_root().join("fixtures/certificates/links-mass.json"))?;
+    let output = check(&repo_root().join("fixtures/certificates/links-convergence.json"))?;
     let stdout = String::from_utf8_lossy(&output.stdout);
     ensure(output.status.code() == Some(0), "expected exit status 0")?;
     ensure(
-        stdout.contains("claim 0 Mass row 0: accepted")
-            && stdout.contains("claim 1 Mass row 1: accepted"),
-        "missing accepted verdicts",
-    )?;
-    ensure(
-        stdout.contains("2 of 2 claims accepted in"),
-        "missing summary with timing",
+        stdout.starts_with("claim 0 Mass row 0: accepted\n")
+            && stdout.contains("\nclaim 4 ConvergenceBound: accepted\n5 of 5 claims accepted in "),
+        "missing verdicts or summary",
     )
 }
 
 #[test]
-fn rejects_row_that_does_not_sum_to_one() -> Result<(), TestError> {
-    if !lake_available("rejects_row_that_does_not_sum_to_one") {
+fn lean_rejected_claim_exits_one() -> Result<(), TestError> {
+    if !lake_available("lean_rejected_claim_exits_one")? {
         return Ok(());
     }
-    let output = check(&repo_root().join("fixtures/certificates/reject/does-not-sum-to-one.json"))?;
+    let output = check(
+        &repo_root().join("fixtures/certificates/reject/termination-wrong-expected-attempts.json"),
+    )?;
     ensure(output.status.code() == Some(1), "expected exit status 1")?;
     ensure(
-        String::from_utf8_lossy(&output.stdout).contains(": rejected"),
+        String::from_utf8_lossy(&output.stdout).contains("claim 0 Termination: rejected"),
         "missing rejected verdict",
     )
 }
 
 #[test]
-fn rejects_mutant_entry() -> Result<(), TestError> {
-    if !lake_available("rejects_mutant_entry") {
-        return Ok(());
-    }
-    let golden =
-        std::fs::read_to_string(repo_root().join("fixtures/certificates/links-mass.json"))?;
-    let original = "\"num\": \"9\",\n          \"den\": \"10\"";
-    ensure(
-        golden.contains(original),
-        "golden file has an unexpected layout",
-    )?;
-    let mutant = golden.replacen(
-        original,
-        "\"num\": \"999\",\n          \"den\": \"1000\"",
-        1,
-    );
-    let dir = scratch("mutant")?;
-    let path = dir.join("mutant.json");
-    std::fs::write(&path, mutant)?;
-    let output = check(&path)?;
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    ensure(output.status.code() == Some(1), "expected exit status 1")?;
-    ensure(
-        stdout.contains("claim 0 Mass row 0: rejected")
-            && stdout.contains("claim 1 Mass row 1: accepted"),
-        "expected row 0 rejected and row 1 accepted",
-    )
-}
-
-#[test]
-fn malformed_certificate_exits_with_status_two() -> Result<(), TestError> {
-    if !lake_available("malformed_certificate_exits_with_status_two") {
+fn lean_malformed_certificate_exits_with_status_two() -> Result<(), TestError> {
+    if !lake_available("lean_malformed_certificate_exits_with_status_two")? {
         return Ok(());
     }
     let output = check(&repo_root().join("fixtures/certificates/reject/duplicate-key.json"))?;
@@ -89,41 +61,60 @@ fn malformed_certificate_exits_with_status_two() -> Result<(), TestError> {
 }
 
 #[test]
+fn lean_device_instead_of_a_file_exits_with_status_two() -> Result<(), TestError> {
+    if !lake_available("lean_device_instead_of_a_file_exits_with_status_two")? {
+        return Ok(());
+    }
+    let output = check(Path::new("/dev/zero"))?;
+    ensure(output.status.code() == Some(2), "expected exit status 2")?;
+    ensure(
+        String::from_utf8_lossy(&output.stderr).contains("certificate is not a regular file"),
+        "missing regular file error",
+    )
+}
+
+#[test]
 fn missing_certificate_exits_with_status_two() -> Result<(), TestError> {
     let output = check(&repo_root().join("fixtures/certificates/no-such-file.json"))?;
     ensure(output.status.code() == Some(2), "expected exit status 2")
 }
 
+/// Runs `axiom check` with a `lake` on PATH that sleeps for ten seconds in two
+/// processes, one in the background holding the output pipes as Lean would,
+/// and
+/// the time limit set to `limit`.
+fn check_with_sleeping_lake(name: &str, limit: &str) -> Result<Output, TestError> {
+    let dir = scratch(name)?;
+    let lake = dir.join("lake");
+    std::fs::write(&lake, "#!/bin/sh\n/bin/sleep 10 &\n/bin/sleep 10\n")?;
+    let chmod = Command::new("chmod").arg("755").arg(&lake).status()?;
+    ensure(chmod.success(), "could not make the stand-in executable")?;
+    Ok(Command::new(env!("CARGO_BIN_EXE_axiom"))
+        .arg("check")
+        .arg(repo_root().join("fixtures/certificates/links-mass.json"))
+        .env("PATH", &dir)
+        .env("AXIOM_CHECK_TIMEOUT_SECS", limit)
+        .output()?)
+}
+
 #[test]
-fn accepts_convergence_and_termination_goldens() -> Result<(), TestError> {
-    if !lake_available("accepts_convergence_and_termination_goldens") {
-        return Ok(());
-    }
-    let links = check(&repo_root().join("fixtures/certificates/links-convergence.json"))?;
-    ensure(links.status.code() == Some(0), "expected exit status 0")?;
+fn checker_over_its_time_limit_is_killed_with_status_three() -> Result<(), TestError> {
+    let output = check_with_sleeping_lake("timeout", "1")?;
+    ensure(output.status.code() == Some(3), "expected exit status 3")?;
     ensure(
-        String::from_utf8_lossy(&links.stdout).contains("claim 4 ConvergenceBound: accepted"),
-        "missing accepted convergence bound",
-    )?;
-    let retry = check(&repo_root().join("fixtures/certificates/retry-termination.json"))?;
-    ensure(retry.status.code() == Some(0), "expected exit status 0")?;
-    ensure(
-        String::from_utf8_lossy(&retry.stdout).contains("claim 0 Termination: accepted"),
-        "missing accepted termination",
+        String::from_utf8_lossy(&output.stderr).contains("killed after the limit of 1 s"),
+        "missing time limit error",
     )
 }
 
 #[test]
-fn reports_a_rejected_termination_claim_with_status_one() -> Result<(), TestError> {
-    if !lake_available("reports_a_rejected_termination_claim_with_status_one") {
-        return Ok(());
+fn invalid_time_limit_is_a_usage_error() -> Result<(), TestError> {
+    for limit in ["0", "-1", "ten"] {
+        let output = check_with_sleeping_lake("bad-timeout", limit)?;
+        ensure(
+            output.status.code() == Some(2),
+            format!("{limit}: expected exit status 2"),
+        )?;
     }
-    let output = check(
-        &repo_root().join("fixtures/certificates/reject/termination-wrong-expected-attempts.json"),
-    )?;
-    ensure(output.status.code() == Some(1), "expected exit status 1")?;
-    ensure(
-        String::from_utf8_lossy(&output.stdout).contains("claim 0 Termination: rejected"),
-        "missing rejected verdict",
-    )
+    Ok(())
 }

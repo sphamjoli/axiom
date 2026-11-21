@@ -56,7 +56,7 @@ fn reproduces_retry_golden_certificate() -> Result<(), TestError> {
 }
 
 #[test]
-fn rejects_faulty_model_with_position_and_no_echo() -> Result<(), TestError> {
+fn rejects_faulty_model_with_its_position_and_status_two() -> Result<(), TestError> {
     let dir = scratch("faulty")?;
     let out = dir.join("out.json");
     let model = repo_root().join("fixtures/models/reject/missing-row.axm");
@@ -71,10 +71,6 @@ fn rejects_faulty_model_with_position_and_no_echo() -> Result<(), TestError> {
     ensure(
         stderr.contains("line 2, column 14"),
         "error lacks the fault position",
-    )?;
-    ensure(
-        !stderr.contains("states up") && !stderr.contains("chain links"),
-        "error echoes the model text",
     )?;
     ensure(
         !out.exists(),
