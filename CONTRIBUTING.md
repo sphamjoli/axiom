@@ -48,6 +48,7 @@ The individual targets are listed below; `make help` prints the same list.
 | `make rust-doc` | Builds the Rust documentation and treats every warning as an error. |
 | `make lean-check` | A fast text search for Lean constructs that skip or bypass proof checking: `sorry`, `admit`, `native_decide`, new `axiom` declarations and similar. |
 | `make lean-build` | Builds the Lean checker, treating warnings as errors. |
+| `make lean-test` | Runs the checker tests in `lean/AxiomCheckTest/` against the shared certificate fixtures. |
 | `make lean-audit` | Asks the Lean kernel which axioms each checker declaration depends on, and fails unless the only ones are the three standard axioms of Lean's logic (`propext`, `Classical.choice` and `Quot.sound`). This catches bypasses that the text search misses. |
 
 On some recent macOS versions the mathlib cache tool fails to start. `make lean-cache`, and therefore `make lean-build` and `make lean-audit`, then fail locally even though `cd lean && lake build` succeeds. CI runs on Linux and is unaffected.
@@ -57,7 +58,8 @@ On some recent macOS versions the mathlib cache tool fails to start. `make lean-
 | Path | Contents |
 | --- | --- |
 | `Cargo.toml`, `crates/` | The Rust engine, a Cargo workspace. `crates/axiom-core` holds exact probabilities, transition rows, two-state chains and affine updates. `crates/axiom-cert` writes and reads certificates in the version 1 format. Each crate keeps its tests in its own `tests/` folder. |
-| `lean/` | The Lean 4 project for the `AxiomCheck` checker, pinned to Lean v4.19.0 and mathlib v4.19.0. `lean/scripts/AxiomAudit.lean` implements the axiom audit. |
+| `lean/` | The Lean 4 project for the `AxiomCheck` checker, pinned to Lean v4.19.0 and mathlib v4.19.0. `AxiomCheck/Json.lean` is the strict JSON reader and `AxiomCheck/Parse.lean` the certificate reader; their tests are in `lean/AxiomCheckTest/`. `lean/scripts/AxiomAudit.lean` implements the axiom audit. |
+| `fixtures/certificates/` | Certificates shared by the engine's and the checker's tests: a golden file both must read, and rejection fixtures both must reject. |
 | `docs/adr/` | Architecture decision records: one file per significant design decision, with the options considered and the consequences. |
 | `docs/` | Diagrams drawn in Excalidraw: each has an editable `.excalidraw` source and a rendered `.svg`. Diagrams are always drawn in Excalidraw, never Mermaid. |
 | `scripts/` | The checks run by the Git hooks and by CI. |
@@ -71,7 +73,7 @@ The hooks are managed by lefthook and defined in `lefthook.yml`.
 | --- | --- |
 | pre-commit | Rust formatting; forbidden Lean constructs; decorative separator comments and comments that trail code on the same line; Markdown paragraphs split across several lines; validity of YAML, TOML and shell files; workflow lint when actionlint is installed; a guard that refuses to commit local planning files. |
 | commit-msg | The commit message format described below. |
-| pre-push | Clippy, the Rust tests, the forbidden-construct search and the axiom audit. |
+| pre-push | Clippy, the Rust tests, the forbidden-construct search, the Lean tests and the axiom audit. |
 
 A hook whose script cannot find a JavaScript runtime skips instead of failing, so that commits from graphical Git clients with a restricted environment are not blocked. CI runs the same checks and does not skip them.
 
