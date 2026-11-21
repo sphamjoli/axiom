@@ -1,0 +1,19 @@
+[package]
+name = "axiom-infer"
+description = "Black-box analysis: runs a model it cannot see and proposes candidate claims from samples"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+axiom-core = { workspace = true }
+axiom-model = { workspace = true }
+axiom-sim = { workspace = true }
+num-bigint = { workspace = true }
+num-rational = { workspace = true }
+num-traits = { workspace = true }
+thiserror = { workspace = true }
+
+[lints]
+workspace = true

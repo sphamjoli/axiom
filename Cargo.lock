@@ -55,6 +55,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "axiom-infer"
+version = "0.1.0"
+dependencies = [
+ "axiom-core",
+ "axiom-model",
+ "axiom-sim",
+ "num-bigint",
+ "num-rational",
+ "num-traits",
+ "thiserror",
+]
+
+[[package]]
 name = "axiom-model"
 version = "0.1.0"
 dependencies = [
