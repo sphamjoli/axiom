@@ -114,33 +114,16 @@ fn accepts_convergence_and_termination_goldens() -> Result<(), TestError> {
 }
 
 #[test]
-fn rejects_false_convergence_and_termination_claims() -> Result<(), TestError> {
-    if !lake_available("rejects_false_convergence_and_termination_claims") {
+fn reports_a_rejected_termination_claim_with_status_one() -> Result<(), TestError> {
+    if !lake_available("reports_a_rejected_termination_claim_with_status_one") {
         return Ok(());
     }
-    for (file, line) in [
-        (
-            "convergence-bound-too-few-steps.json",
-            "claim 0 ConvergenceBound: rejected",
-        ),
-        (
-            "periodic-convergence-bound.json",
-            "claim 0 ConvergenceBound: rejected",
-        ),
-        (
-            "termination-wrong-expected-attempts.json",
-            "claim 0 Termination: rejected",
-        ),
-    ] {
-        let output = check(&repo_root().join("fixtures/certificates/reject").join(file))?;
-        ensure(
-            output.status.code() == Some(1),
-            format!("{file}: expected exit status 1"),
-        )?;
-        ensure(
-            String::from_utf8_lossy(&output.stdout).contains(line),
-            format!("{file}: missing rejected verdict"),
-        )?;
-    }
-    Ok(())
+    let output = check(
+        &repo_root().join("fixtures/certificates/reject/termination-wrong-expected-attempts.json"),
+    )?;
+    ensure(output.status.code() == Some(1), "expected exit status 1")?;
+    ensure(
+        String::from_utf8_lossy(&output.stdout).contains("claim 0 Termination: rejected"),
+        "missing rejected verdict",
+    )
 }

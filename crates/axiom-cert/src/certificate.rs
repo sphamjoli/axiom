@@ -27,9 +27,10 @@ pub const MAX_STATES: usize = 16;
 /// attempt count of a `Termination` claim's `failure_after`.
 ///
 /// Checking such a claim raises a fraction with parts of at most 64 digits
-/// to this power, so the result has at most about 640,000 digits and both
-/// the engine and the checker compute it in well under a second.
-pub const MAX_COUNT: u64 = 10_000;
+/// to this power, so the result has at most about 64,000 digits and both
+/// the engine and the checker compute it in well under a second; checking
+/// is quadratic in the count, which is why the limit is not higher.
+pub const MAX_COUNT: u64 = 1_000;
 
 /// The model a certificate embeds.
 #[derive(Debug, Clone, PartialEq, Eq)]
