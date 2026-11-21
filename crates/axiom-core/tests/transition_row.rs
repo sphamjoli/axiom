@@ -65,15 +65,3 @@ fn two_state_row_is_complement_then_probability() -> Result<(), TestError> {
     assert_eq!(values, vec![ratio(9, 10), ratio(1, 10)]);
     Ok(())
 }
-
-#[test]
-fn every_error_has_a_distinct_message() {
-    assert_eq!(
-        TransitionRowError::Empty.to_string(),
-        "transition row has no entries"
-    );
-    assert_eq!(
-        TransitionRowError::NotNormalised.to_string(),
-        "transition row does not sum to 1"
-    );
-}

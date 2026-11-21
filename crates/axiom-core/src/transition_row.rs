@@ -26,6 +26,20 @@ pub enum TransitionRowError {
     NotNormalised,
 }
 
+impl TransitionRowError {
+    /// Every variant, in declaration order.
+    pub const ALL: [Self; 2] = [Self::Empty, Self::NotNormalised];
+
+    /// A stable kebab-case name for the error, the same on every machine.
+    #[must_use]
+    pub const fn code(&self) -> &'static str {
+        match self {
+            Self::Empty => "empty-row",
+            Self::NotNormalised => "row-not-normalised",
+        }
+    }
+}
+
 impl TransitionRow {
     /// Validates that `probabilities` is non-empty and sums to exactly one.
     ///

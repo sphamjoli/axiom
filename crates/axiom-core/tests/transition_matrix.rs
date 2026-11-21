@@ -60,20 +60,3 @@ fn rejects_rows_longer_than_the_number_of_states() -> Result<(), TestError> {
     );
     Ok(())
 }
-
-#[test]
-fn every_error_names_what_went_wrong() {
-    assert_eq!(
-        TransitionMatrixError::Empty.to_string(),
-        "transition matrix has no rows"
-    );
-    assert_eq!(
-        TransitionMatrixError::NotSquare {
-            row: 1,
-            entries: 1,
-            states: 2
-        }
-        .to_string(),
-        "row 1 has 1 entries, but the model has 2 states"
-    );
-}

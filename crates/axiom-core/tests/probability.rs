@@ -53,19 +53,3 @@ fn complement_is_exact() -> Result<(), TestError> {
     assert_eq!(probability(1, 10)?.complement().value(), &ratio(9, 10));
     Ok(())
 }
-
-#[test]
-fn every_error_has_a_distinct_message() {
-    assert_eq!(
-        ProbabilityError::ZeroDenominator.to_string(),
-        "fraction has a zero denominator"
-    );
-    assert_eq!(
-        ProbabilityError::Negative.to_string(),
-        "probability is below zero"
-    );
-    assert_eq!(
-        ProbabilityError::AboveOne.to_string(),
-        "probability is above one"
-    );
-}

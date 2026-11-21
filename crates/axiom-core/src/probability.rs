@@ -26,6 +26,21 @@ pub enum ProbabilityError {
     AboveOne,
 }
 
+impl ProbabilityError {
+    /// Every variant, in declaration order.
+    pub const ALL: [Self; 3] = [Self::ZeroDenominator, Self::Negative, Self::AboveOne];
+
+    /// A stable kebab-case name for the error, the same on every machine.
+    #[must_use]
+    pub const fn code(&self) -> &'static str {
+        match self {
+            Self::ZeroDenominator => "zero-denominator",
+            Self::Negative => "probability-below-zero",
+            Self::AboveOne => "probability-above-one",
+        }
+    }
+}
+
 impl Probability {
     /// Validates that `value` lies between zero and one inclusive and stores
     /// it in lowest terms.

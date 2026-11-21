@@ -18,6 +18,20 @@ pub enum TwoStateChainError {
     NotContracting,
 }
 
+impl TwoStateChainError {
+    /// Every variant, in declaration order.
+    pub const ALL: [Self; 2] = [Self::NoUniqueFixedPoint, Self::NotContracting];
+
+    /// A stable kebab-case name for the error, the same on every machine.
+    #[must_use]
+    pub const fn code(&self) -> &'static str {
+        match self {
+            Self::NoUniqueFixedPoint => "no-unique-fixed-point",
+            Self::NotContracting => "not-contracting",
+        }
+    }
+}
+
 /// A chain with two states that moves between them at fixed probabilities.
 ///
 /// From the first state it moves to the second with probability

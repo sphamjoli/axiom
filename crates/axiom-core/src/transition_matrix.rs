@@ -29,6 +29,17 @@ pub enum TransitionMatrixError {
     },
 }
 
+impl TransitionMatrixError {
+    /// A stable kebab-case name for the error, the same on every machine.
+    #[must_use]
+    pub const fn code(&self) -> &'static str {
+        match self {
+            Self::Empty => "empty-matrix",
+            Self::NotSquare { .. } => "matrix-not-square",
+        }
+    }
+}
+
 impl TransitionMatrix {
     /// Validates that `rows` is non-empty and square.
     ///
