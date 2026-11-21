@@ -17,6 +17,7 @@ mod error;
 mod fraction_text;
 
 pub use certificate::{
-    Certificate, Claim, FailureAfter, MAX_CERTIFICATE_BYTES, MAX_COUNT, MAX_STATES, Model,
+    Certificate, Claim, FailureAfter, MAX_CERTIFICATE_BYTES, MAX_COUNT, MAX_JSON_DEPTH,
+    MAX_JSON_ITEMS, MAX_JSON_MEMBERS, MAX_STATES, Model,
 };
 pub use error::{CertificateError, ConvergenceBoundError};

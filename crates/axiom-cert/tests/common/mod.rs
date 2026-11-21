@@ -42,6 +42,9 @@ pub enum TestError {
     /// A certificate that must be rejected was accepted.
     #[error("certificate was accepted but must be rejected")]
     Accepted,
+    /// A line of the fixture reason table is malformed.
+    #[error("fixture reason table line is malformed")]
+    Fixture,
 }
 
 /// The golden certificate for the link model, written by hand.

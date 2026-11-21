@@ -15,6 +15,7 @@ use axiom_core::{Probability, TwoStateChain};
 use common::{TestError, link_chain, ratio};
 use num_bigint::BigInt;
 use num_rational::BigRational;
+use proptest::prelude::{Strategy, prop_assert_eq, proptest};
 
 /// The golden version 3 certificate for the link model, generated
 /// independently of the engine.
@@ -141,6 +142,66 @@ fn the_engine_refuses_failure_counts_above_the_limit() {
     assert!(Certificate::termination(Probability::one(), MAX_COUNT).is_ok());
     assert!(matches!(
         Certificate::termination(Probability::one(), MAX_COUNT + 1),
-        Err(CertificateError::CountOutOfRange { .. })
+        Err(CertificateError::CountOutOfRange {
+            claim: 0,
+            limit: MAX_COUNT
+        })
     ));
+}
+
+#[test]
+fn failure_after_is_written_only_while_it_fits_sixty_four_digits() -> Result<(), TestError> {
+    let failure_after = |denominator| -> Result<bool, TestError> {
+        let success = Probability::try_from_fraction(1, denominator)?;
+        Ok(matches!(
+            Certificate::termination(success, 16)?.claims(),
+            [Claim::Termination {
+                failure_after: Some(_),
+                ..
+            }]
+        ))
+    };
+    // 10^4 to the 16th power has 65 digits; 9999 to the 16th has 64.
+    assert!(failure_after(9_999)?);
+    assert!(!failure_after(10_000)?);
+    Ok(())
+}
+
+fn any_probability() -> impl Strategy<Value = Probability> {
+    (0_i64..=1_000, 1_i64..=1_000).prop_filter_map(
+        "fraction must not exceed one",
+        |(numerator, denominator)| Probability::try_from_fraction(numerator, denominator).ok(),
+    )
+}
+
+proptest! {
+    #[test]
+    fn every_convergence_bound_certificate_round_trips(
+        a in any_probability(),
+        b in any_probability(),
+        start in any_probability(),
+        denominator in 1_i64..=1_000_000,
+    ) {
+        let tolerance = ratio(1, denominator);
+        if let Ok(written) =
+            Certificate::two_state_with_bound(&TwoStateChain::new(a, b), &start, &tolerance)
+        {
+            let text = written.to_json()?;
+            let read = Certificate::from_json(&text)?;
+            prop_assert_eq!(&read, &written);
+            prop_assert_eq!(read.to_json()?, text);
+        }
+    }
+
+    #[test]
+    fn every_termination_certificate_round_trips(
+        success in any_probability(),
+        attempts in 0_u64..=MAX_COUNT,
+    ) {
+        let written = Certificate::termination(success, attempts)?;
+        let text = written.to_json()?;
+        let read = Certificate::from_json(&text)?;
+        prop_assert_eq!(&read, &written);
+        prop_assert_eq!(read.to_json()?, text);
+    }
 }

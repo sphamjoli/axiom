@@ -32,6 +32,15 @@ pub const MAX_STATES: usize = 16;
 /// is quadratic in the count, which is why the limit is not higher.
 pub const MAX_COUNT: u64 = 1_000;
 
+/// The deepest nesting of arrays and objects a certificate may have.
+pub const MAX_JSON_DEPTH: usize = 8;
+
+/// The most members a JSON object in a certificate may have.
+pub const MAX_JSON_MEMBERS: usize = 8;
+
+/// The most items a JSON array in a certificate may have.
+pub const MAX_JSON_ITEMS: usize = 64;
+
 /// The model a certificate embeds.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
@@ -66,10 +75,11 @@ pub enum Claim {
         /// The index of the row the claim is about.
         row: usize,
     },
-    /// The model has two states, and `value` is a fixed point of the update
-    /// `d' = lambda d + c` of the probability `d` of the second state, where
+    /// The model has two states with `a + b != 0`, and `value` is the fixed
+    /// point of the update `d' = lambda d + c` of the probability `d` of the second state, where
     /// `a` is entry `[0][1]`, `b` is entry `[1][0]`, `lambda = 1 - a - b` and
-    /// `c = a`. Introduced in version 2.
+    /// `c = a`, which is then unique: the steady state `a / (a + b)`.
+    /// Introduced in version 2.
     FixedPoint {
         /// The claimed steady-state probability of the second state.
         value: Probability,
@@ -203,7 +213,8 @@ impl Certificate {
     ///
     /// Returns [`CertificateError::NoConvergenceBound`] when the chain has no
     /// unique steady state or does not contract, when `tolerance` is not
-    /// positive, or when more than [`MAX_COUNT`] steps would be needed.
+    /// positive, when `start` or `tolerance` has a part longer than the
+    /// format's 64 digits, or when more than [`MAX_COUNT`] steps would be needed.
     pub fn two_state_with_bound(
         chain: &TwoStateChain,
         start: &Probability,
@@ -212,7 +223,10 @@ impl Certificate {
         let chain_error =
             |error| CertificateError::NoConvergenceBound(ConvergenceBoundError::Chain(error));
         let mut certificate = Self::two_state(chain).map_err(chain_error)?;
-        if !tolerance.is_positive() {
+        if !tolerance.is_positive()
+            || !FractionText::fits(tolerance)
+            || !FractionText::fits(start.value())
+        {
             return Err(CertificateError::NoConvergenceBound(
                 ConvergenceBoundError::NotReached,
             ));
@@ -235,7 +249,8 @@ impl Certificate {
     /// `success`: one [`Claim::Termination`] with the probability of eventual
     /// success, the expected number of attempts `1 / success` when `success`
     /// is positive, and the probability that the first `failure_attempts`
-    /// attempts all fail.
+    /// attempts all fail when that probability fits the format's 64-digit
+    /// limit; otherwise the claim has no `failure_after`.
     ///
     /// # Errors
     ///
@@ -254,15 +269,16 @@ impl Certificate {
         let probability = success_probability(&success);
         let expected_attempts = (!success.value().is_zero()).then(|| success.value().recip());
         let failure = success.complement().pow(failure_attempts);
+        let failure_after = FractionText::fits(failure.value()).then_some(FailureAfter {
+            attempts: failure_attempts,
+            probability: failure,
+        });
         Ok(Self {
             model: Model::Retry { success },
             claims: vec![Claim::Termination {
                 probability,
                 expected_attempts,
-                failure_after: Some(FailureAfter {
-                    attempts: failure_attempts,
-                    probability: failure,
-                }),
+                failure_after,
             }],
         })
     }
@@ -364,6 +380,7 @@ impl Certificate {
                 limit: MAX_CERTIFICATE_BYTES,
             });
         }
+        check_json_limits(&serde_json::from_str(text)?, 1)?;
         let document: CertificateDocument = serde_json::from_str(text)?;
         if document.format != FORMAT {
             return Err(CertificateError::UnsupportedFormat);
@@ -389,6 +406,30 @@ impl Certificate {
         let claims = parse_claims(&document.claims, document.version, &model)?;
         Ok(Self { model, claims })
     }
+}
+
+/// Rejects JSON nested deeper than [`MAX_JSON_DEPTH`], an object with more
+/// than [`MAX_JSON_MEMBERS`] members or an array with more than
+/// [`MAX_JSON_ITEMS`] items, the same limits the checker's reader enforces.
+/// `depth` is the nesting level of `value` if it is an array or object.
+fn check_json_limits(value: &serde_json::Value, depth: usize) -> Result<(), CertificateError> {
+    let children: Vec<&serde_json::Value> = match value {
+        serde_json::Value::Array(items) if items.len() > MAX_JSON_ITEMS => {
+            return Err(CertificateError::JsonLimit);
+        }
+        serde_json::Value::Object(members) if members.len() > MAX_JSON_MEMBERS => {
+            return Err(CertificateError::JsonLimit);
+        }
+        serde_json::Value::Array(items) => items.iter().collect(),
+        serde_json::Value::Object(members) => members.values().collect(),
+        _ => return Ok(()),
+    };
+    if depth > MAX_JSON_DEPTH {
+        return Err(CertificateError::JsonLimit);
+    }
+    children
+        .into_iter()
+        .try_for_each(|child| check_json_limits(child, depth + 1))
 }
 
 /// The probability that a retry loop with success probability `success`
@@ -544,7 +585,7 @@ fn parse_claim(
         ClaimDocument::FixedPoint { value } => {
             let chain = two_state_chain(index, version, VERSION_2, model)?;
             let value = probability(value)?;
-            if chain.second_state_update().apply(value.value()) != *value.value() {
+            if chain.steady_state().as_ref() != Ok(&value) {
                 return Err(false_claim);
             }
             Ok(Claim::FixedPoint { value })

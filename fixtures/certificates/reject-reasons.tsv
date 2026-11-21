@@ -1,0 +1,84 @@
+byte-order-mark.json	Json	invalid JSON at character 0: unexpected character
+claim-at-member-limit.json	Json	unexpected or missing field
+claim-past-member-limit.json	JsonLimit	invalid JSON at character 255: object has too many members
+contraction-factor-one.json	FalseClaim	check
+contraction-missing-factor.json	Json	unexpected or missing field
+convergence-bound-missing-steps.json	Json	unexpected or missing field
+convergence-bound-on-retry.json	NotChain	claim kind needs a chain model
+convergence-bound-start-above-one.json	InvalidClaimFraction	entry is above one
+convergence-bound-steps-as-string.json	Json	count must be an integer
+convergence-bound-too-few-steps.json	FalseClaim	check
+convergence-bound-too-many-steps.json	CountOutOfRange	count is above the limit
+convergence-bound-zero-tolerance.json	InvalidClaimFraction	tolerance must be positive
+does-not-sum-to-one.json	TransitionRow	check
+duplicate-key.json	Json	unexpected or missing field
+factor-as-number.json	Json	expected an object
+factor-double-minus.json	InvalidClaimFraction	fraction is not in canonical form
+factor-minus-only.json	InvalidClaimFraction	fraction is not in canonical form
+factor-negative-denominator.json	InvalidClaimFraction	fraction is not in canonical form
+factor-negative-leading-zero.json	InvalidClaimFraction	fraction is not in canonical form
+factor-negative-not-lowest-terms.json	InvalidClaimFraction	fraction is not in canonical form
+factor-negative-zero.json	InvalidClaimFraction	fraction is not in canonical form
+factor-plus-sign.json	InvalidClaimFraction	fraction is not in canonical form
+fixed-point-above-one.json	InvalidClaimFraction	entry is above one
+fixed-point-extra-field.json	Json	unexpected or missing field
+fixed-point-missing-value.json	Json	unexpected or missing field
+fixed-point-negative-value.json	InvalidClaimFraction	fraction is not in canonical form
+fixed-point-not-lowest-terms.json	InvalidClaimFraction	fraction is not in canonical form
+form-feed-whitespace.json	Json	invalid JSON at character 0: unexpected character
+fraction-as-number.json	Json	num must be a string
+identity-convergence-bound.json	FalseClaim	check
+identity-fixed-point.json	FalseClaim	check
+leading-zero.json	NonCanonicalFraction	fraction is not in canonical form
+mass-with-signed-entry.json	NonCanonicalFraction	fraction is not in canonical form
+model-empty.json	ModelForm	model must have exactly one of rows and retry
+model-rows-and-retry.json	ModelForm	model must have exactly one of rows and retry
+no-break-space-whitespace.json	Json	invalid JSON at character 0: unexpected character
+no-claims.json	NoClaims	certificate makes no claims
+non-stochastic-contraction.json	TransitionRow	check
+non-stochastic-fixed-point.json	TransitionRow	check
+not-lowest-terms.json	NonCanonicalFraction	fraction is not in canonical form
+not-square.json	TransitionMatrix	matrix is not square
+nul-in-format.json	UnsupportedFormat	certificate format is not axiom-certificate
+one-state-contraction.json	NotTwoState	claim kind needs a two-state model
+periodic-contraction.json	FalseClaim	check
+periodic-convergence-bound.json	FalseClaim	check
+repeated-claim.json	DuplicateClaim	a claim is repeated
+repeated-fixed-point.json	DuplicateClaim	a claim is repeated
+repeated-termination.json	DuplicateClaim	a claim is repeated
+retry-fixed-point.json	NotChain	claim kind needs a chain model
+retry-mass.json	NotChain	claim kind needs a chain model
+retry-success-above-one.json	InvalidRetrySuccess	entry is above one
+row-beyond-64-bits.json	Json	claim refers to a missing row
+row-fraction.json	Json	invalid JSON at character 211: only plain integers are allowed
+row-nested-at-depth-limit.json	Json	row must be an integer
+row-nested-past-depth-limit.json	JsonLimit	invalid JSON at character 193: nested too deeply
+row-out-of-range.json	RowOutOfRange	claim refers to a missing row
+termination-expected-attempts-never-succeeds.json	FalseClaim	check
+termination-negative-expected-attempts.json	InvalidClaimFraction	fraction is not in canonical form
+termination-null-expected-attempts.json	Json	invalid JSON at character 183: unexpected character
+termination-on-chain.json	NotRetry	claim kind needs a retry model
+termination-past-item-limit.json	JsonLimit	invalid JSON at character 8221: array has too many items
+termination-too-many-attempts.json	CountOutOfRange	count is above the limit
+termination-unknown-field.json	Json	unexpected or missing field
+termination-wrong-expected-attempts.json	FalseClaim	check
+termination-wrong-failure-after.json	FalseClaim	check
+termination-wrong-probability.json	FalseClaim	check
+three-state-contraction.json	NotTwoState	claim kind needs a two-state model
+three-state-convergence-bound.json	NotTwoState	claim kind needs a two-state model
+three-state-fixed-point.json	NotTwoState	claim kind needs a two-state model
+too-many-members.json	JsonLimit	invalid JSON at character 56: object has too many members
+unknown-claim-kind.json	Json	unknown claim kind
+unknown-field.json	Json	unexpected or missing field
+v1-contraction.json	ClaimNeedsVersion	claim kind needs certificate version 2
+v1-fixed-point.json	ClaimNeedsVersion	claim kind needs certificate version 2
+v2-convergence-bound.json	ClaimNeedsVersion	claim kind needs certificate version 3
+v2-retry-model.json	ModelNeedsVersion	retry model needs certificate version 3
+version-exponent.json	Json	invalid JSON at character 44: only plain integers are allowed
+version-four.json	UnsupportedVersion	unsupported certificate version
+version-negative-zero.json	Json	invalid JSON at character 40: unexpected character
+wrong-contraction-factor.json	FalseClaim	check
+wrong-fixed-point.json	FalseClaim	check
+wrong-format.json	UnsupportedFormat	certificate format is not axiom-certificate
+wrong-version.json	UnsupportedVersion	unsupported certificate version
+zero-denominator.json	NonCanonicalFraction	fraction is not in canonical form

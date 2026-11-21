@@ -41,6 +41,13 @@ impl FractionText {
         }
     }
 
+    /// Whether `value` can be written: its numerator and denominator each
+    /// have at most [`MAX_DIGITS`] digits, not counting a sign.
+    pub(crate) fn fits(value: &BigRational) -> bool {
+        let digits = |number: &BigInt| number.magnitude().to_string().len();
+        digits(value.numer()) <= MAX_DIGITS && digits(value.denom()) <= MAX_DIGITS
+    }
+
     /// Parses the fraction, or returns `None` for every encoding other than
     /// the canonical one.
     pub(crate) fn to_fraction(&self, sign: Sign) -> Option<BigRational> {

@@ -15,6 +15,12 @@ fn certificate_text(entries: &str, row: usize) -> String {
     )
 }
 
+/// Whether `result` is a JSON error on the first line of the one-line
+/// `text`, at a column inside it.
+fn is_json_error_within(result: &Result<Certificate, CertificateError>, text: &str) -> bool {
+    matches!(result, Err(CertificateError::Json { line: 1, column }) if (1..=text.chars().count()).contains(column))
+}
+
 fn halves() -> &'static str {
     r#"{"num":"1","den":"2"},{"num":"1","den":"2"}"#
 }
@@ -62,10 +68,7 @@ fn rejects_a_repeated_claim() {
 fn rejects_a_repeated_key() {
     let text =
         certificate_text(halves(), 0).replace("\"version\":1", "\"version\":1,\"version\":1");
-    assert!(matches!(
-        Certificate::from_json(&text),
-        Err(CertificateError::Json { .. })
-    ));
+    assert!(is_json_error_within(&Certificate::from_json(&text), &text,));
 }
 
 #[test]
@@ -124,7 +127,7 @@ fn rejects_versions_other_than_one_to_three() {
             .replace("\"version\":1", &format!("\"version\":{version}"));
         assert!(matches!(
             Certificate::from_json(&text),
-            Err(CertificateError::UnsupportedVersion(_))
+            Err(CertificateError::UnsupportedVersion(found)) if found.to_string() == version
         ));
     }
 }
@@ -140,10 +143,7 @@ fn rejects_unknown_fields_at_every_level() {
     ];
     for text in variants {
         assert!(
-            matches!(
-                Certificate::from_json(&text),
-                Err(CertificateError::Json { .. })
-            ),
+            is_json_error_within(&Certificate::from_json(&text), &text,),
             "{text}"
         );
     }
@@ -152,15 +152,15 @@ fn rejects_unknown_fields_at_every_level() {
 #[test]
 fn rejects_unknown_claim_kinds_and_missing_fields() {
     let unknown = certificate_text(halves(), 0).replace("\"Mass\"", "\"Unknown\"");
-    assert!(matches!(
-        Certificate::from_json(&unknown),
-        Err(CertificateError::Json { .. })
+    assert!(is_json_error_within(
+        &Certificate::from_json(&unknown),
+        &unknown,
     ));
     let missing =
         certificate_text(halves(), 0).replace(r#","claims":[{"kind":"Mass","row":0}]"#, "");
-    assert!(matches!(
-        Certificate::from_json(&missing),
-        Err(CertificateError::Json { .. })
+    assert!(is_json_error_within(
+        &Certificate::from_json(&missing),
+        &missing,
     ));
 }
 
@@ -182,7 +182,7 @@ fn rejects_fractions_that_are_not_canonical() {
         assert!(
             matches!(
                 Certificate::from_json(&certificate_text(entries, 0)),
-                Err(CertificateError::NonCanonicalFraction { .. })
+                Err(CertificateError::NonCanonicalFraction { row: 0, entry: 0 })
             ),
             "{entries}"
         );
@@ -192,9 +192,9 @@ fn rejects_fractions_that_are_not_canonical() {
 #[test]
 fn rejects_fractions_written_as_json_numbers() {
     let numbers = r#"{"num":1,"den":2},{"num":1,"den":2}"#;
-    assert!(matches!(
-        Certificate::from_json(&certificate_text(numbers, 0)),
-        Err(CertificateError::Json { .. })
+    assert!(is_json_error_within(
+        &Certificate::from_json(&certificate_text(numbers, 0)),
+        &certificate_text(numbers, 0),
     ));
 }
 
@@ -210,7 +210,7 @@ fn accepts_64_digits_and_rejects_65() -> Result<(), TestError> {
     let beyond = format!(r#"{{"num":"1","den":"{ten_to_64}"}},{{"num":"1","den":"1"}}"#);
     assert!(matches!(
         Certificate::from_json(&certificate_text(&beyond, 0)),
-        Err(CertificateError::NonCanonicalFraction { .. })
+        Err(CertificateError::NonCanonicalFraction { row: 0, entry: 0 })
     ));
     Ok(())
 }
@@ -276,9 +276,9 @@ fn rejects_claims_about_missing_rows() {
 #[test]
 fn passes_text_of_exactly_the_limit_to_the_parser() {
     let at_limit = " ".repeat(MAX_CERTIFICATE_BYTES);
-    assert!(matches!(
-        Certificate::from_json(&at_limit),
-        Err(CertificateError::Json { .. })
+    assert!(is_json_error_within(
+        &Certificate::from_json(&at_limit),
+        &at_limit,
     ));
 }
 
@@ -294,13 +294,13 @@ fn rejects_oversized_text_before_parsing() {
 #[test]
 fn rejects_trailing_data_and_malformed_json() {
     let trailing = format!("{} {{}}", certificate_text(halves(), 0));
-    assert!(matches!(
-        Certificate::from_json(&trailing),
-        Err(CertificateError::Json { .. })
+    assert!(is_json_error_within(
+        &Certificate::from_json(&trailing),
+        &trailing,
     ));
-    assert!(matches!(
-        Certificate::from_json("not json"),
-        Err(CertificateError::Json { .. })
+    assert!(is_json_error_within(
+        &Certificate::from_json("not json"),
+        "not json",
     ));
 }
 
@@ -365,13 +365,7 @@ fn rejects_a_long_row_of_large_denominators_before_summing_it() {
     assert!(text.len() <= MAX_CERTIFICATE_BYTES);
     assert!(matches!(
         Certificate::from_json(&text),
-        Err(CertificateError::TransitionMatrix(
-            TransitionMatrixError::NotSquare {
-                row: 0,
-                entries: 3_800,
-                states: 2
-            }
-        ))
+        Err(CertificateError::JsonLimit)
     ));
 }
 
@@ -418,10 +412,7 @@ fn rejects_numbers_written_with_a_fraction_or_exponent() {
     ];
     for text in variants {
         assert!(
-            matches!(
-                Certificate::from_json(&text),
-                Err(CertificateError::Json { .. })
-            ),
+            is_json_error_within(&Certificate::from_json(&text), &text,),
             "{text}"
         );
     }
@@ -430,8 +421,5 @@ fn rejects_numbers_written_with_a_fraction_or_exponent() {
 #[test]
 fn rejects_a_byte_order_mark() {
     let text = format!("\u{feff}{}", certificate_text(halves(), 0));
-    assert!(matches!(
-        Certificate::from_json(&text),
-        Err(CertificateError::Json { .. })
-    ));
+    assert!(is_json_error_within(&Certificate::from_json(&text), &text,));
 }

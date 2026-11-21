@@ -28,6 +28,10 @@ pub enum CertificateError {
         /// The one-based column where parsing stopped.
         column: usize,
     },
+    /// The JSON nests arrays and objects too deeply, or has an object with
+    /// too many members or an array with too many items.
+    #[error("certificate JSON exceeds a nesting, member or item limit")]
+    JsonLimit,
     /// The `format` field is not `axiom-certificate`.
     #[error("certificate format is not axiom-certificate")]
     UnsupportedFormat,
