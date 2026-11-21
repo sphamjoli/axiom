@@ -19,7 +19,7 @@
 //! assert!(json.contains("\"expectedAttempts\":{\"num\":\"10\",\"den\":\"3\"}"));
 //! ```
 
-use axiom_cert::{Certificate, Claim};
+use axiom_cert::{Certificate, Claim, Model};
 use axiom_core::{Probability, TransitionMatrix, TwoStateChain};
 use axiom_model::{CheckedModel, ModelError};
 use num_bigint::BigInt;
@@ -28,7 +28,11 @@ use num_traits::{One, Signed, ToPrimitive, Zero};
 use serde::Serialize;
 use wasm_bindgen::prelude::wasm_bindgen;
 
+mod parametric;
 mod simulation;
+
+pub use parametric::{MAX_POINT_BYTES, PointError};
+use parametric::{ParamBox, ParametricView, Point};
 
 pub use simulation::{
     MAX_ATTEMPTS, MAX_HISTOGRAM_BUCKETS, MAX_PATH_STEPS, MAX_REQUEST_BYTES, MAX_RUNNING_POINTS,
@@ -53,17 +57,72 @@ const STEPS_AFTER_HORIZON: usize = 7;
 #[wasm_bindgen]
 #[must_use]
 pub fn analyse(source: &str) -> String {
-    let result = match axiom_model::parse(source) {
+    encode(&match axiom_model::parse(source) {
         Ok(model) => AnalyzeResult::Accepted {
             ok: true,
             analysis: Box::new(analyse_model(model)),
         },
-        Err(error) => AnalyzeResult::Rejected {
-            ok: false,
-            diagnostics: vec![Diagnostic::from_error(&error)],
-        },
+        Err(error) => rejected(&error),
+    })
+}
+
+/// Analyses the parametric two-state chain in `source` at the point
+/// `point_json`, `{"a": {"num": "1", "den": "10"}, "b": {...}}`, and returns
+/// the same JSON as [`analyse`], with the chain and convergence of that
+/// instance.
+///
+/// The point must lie inside both parameters' intervals, open ends
+/// excluded. A refused point yields `{"ok": false, "error": {"code",
+/// "message"}}` with a stable code from [`PointError`] and a fixed message
+/// that never repeats the request or the model.
+///
+/// ```
+/// let model = "param a in ]0, 1[\nparam b in ]0, 1[\nchain c {\n  states s, t\n  from s: s 1 - a, t a\n  from t: s b, t 1 - b\n}\n";
+/// let json = axiom_wasm::analyse_at(model, r#"{"a": {"num": "1", "den": "1"}, "b": {"num": "1", "den": "2"}}"#);
+/// assert!(json.contains(r#""code":"point-out-of-range""#));
+/// ```
+#[wasm_bindgen]
+#[must_use]
+pub fn analyse_at(source: &str, point_json: &str) -> String {
+    let point = match parametric::parse_point(point_json) {
+        Ok(point) => point,
+        Err(error) => return encode(&refused(error)),
     };
-    serde_json::to_string(&result).unwrap_or_else(|_| {
+    encode(&match axiom_model::parse(source) {
+        Ok(CheckedModel::Chain(chain)) if chain.matrix.is_none() => match ParamBox::of(&chain) {
+            Ok(param_box) => match parametric_analysis(&chain, &param_box, &point) {
+                Ok(analysis) => AnalyzeResult::Accepted {
+                    ok: true,
+                    analysis: Box::new(analysis),
+                },
+                Err(error) => refused(error),
+            },
+            Err(_) => refused(PointError::NotParametric),
+        },
+        Ok(_) => refused(PointError::NotParametric),
+        Err(error) => rejected(&error),
+    })
+}
+
+fn rejected(error: &ModelError) -> AnalyzeResult {
+    AnalyzeResult::Rejected {
+        ok: false,
+        diagnostics: vec![Diagnostic::from_error(error)],
+    }
+}
+
+fn refused(error: PointError) -> AnalyzeResult {
+    AnalyzeResult::Refused {
+        ok: false,
+        error: PointErrorView {
+            code: error.code(),
+            message: error.to_string(),
+        },
+    }
+}
+
+fn encode(result: &AnalyzeResult) -> String {
+    serde_json::to_string(result).unwrap_or_else(|_| {
         String::from(
             r#"{"ok":false,"diagnostics":[{"line":1,"column":1,"code":"internal","message":"the engine could not encode its result"}]}"#,
         )
@@ -112,6 +171,20 @@ enum AnalyzeResult {
         /// Why, with positions.
         diagnostics: Vec<Diagnostic>,
     },
+    /// The point to analyse was refused.
+    Refused {
+        /// Always `false`.
+        ok: bool,
+        /// Why, as a stable code and a fixed message.
+        error: PointErrorView,
+    },
+}
+
+/// A refused point: a stable code and a fixed message.
+#[derive(Serialize)]
+struct PointErrorView {
+    code: &'static str,
+    message: String,
 }
 
 /// A fault in the model, without any text of the model.
@@ -162,7 +235,8 @@ struct Analysis {
     convergence: Option<Convergence>,
     retry: Option<Retry>,
     certificate: Option<CertificateView>,
-    notice: Option<&'static str>,
+    parametric: Option<ParametricView>,
+    notice: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -225,53 +299,71 @@ struct CertificateView {
 fn analyse_model(model: CheckedModel) -> Analysis {
     match model {
         CheckedModel::Chain(chain) => {
-            let Some(matrix) = chain.matrix else {
-                return Analysis {
-                    name: chain.name,
-                    chain: None,
-                    convergence: None,
-                    retry: None,
-                    certificate: None,
-                    notice: Some(
-                        "The model is valid. Chains with parameters are not yet analysed in the browser.",
-                    ),
+            let Some(matrix) = &chain.matrix else {
+                return match ParamBox::of(&chain) {
+                    Ok(param_box) => parametric_analysis(&chain, &param_box, &param_box.midpoint())
+                        .unwrap_or_else(|error| notice(chain.name.clone(), error.to_string())),
+                    Err(unsupported) => notice(chain.name.clone(), unsupported.notice()),
                 };
             };
-            let view = chain_view(&chain.name, &chain.states, &matrix);
-            let convergence = convergence(&chain.states, &matrix);
-            let certificate = certificate_view(&chain.states, &Certificate::strongest(matrix));
             Analysis {
-                name: chain.name,
-                chain: Some(view),
-                convergence,
-                retry: None,
-                certificate,
-                notice: None,
+                certificate: certificate_view(
+                    &chain.states,
+                    &Certificate::strongest(matrix.clone()),
+                ),
+                ..fixed_chain(&chain.name, &chain.states, matrix)
             }
         }
-        CheckedModel::Retry(retry) => {
-            let Some(success) = retry.probability else {
-                return Analysis {
-                    name: retry.name,
-                    chain: None,
-                    convergence: None,
-                    retry: None,
-                    certificate: None,
-                    notice: Some(
-                        "The model is valid. Retries with parameters are not yet analysed in the browser.",
-                    ),
-                };
-            };
-            Analysis {
-                name: retry.name,
-                chain: None,
-                convergence: None,
+        CheckedModel::Retry(retry) => match retry.probability {
+            Some(success) => Analysis {
                 retry: Some(retry_view(&success)),
-                certificate: None,
                 notice: None,
-            }
-        }
+                ..notice(retry.name, String::new())
+            },
+            None => notice(retry.name, String::from(parametric::RETRY_NOTICE)),
+        },
     }
+}
+
+/// An analysis with nothing but a notice.
+fn notice(name: String, text: String) -> Analysis {
+    Analysis {
+        name,
+        chain: None,
+        convergence: None,
+        retry: None,
+        certificate: None,
+        parametric: None,
+        notice: Some(text),
+    }
+}
+
+/// The chain and convergence views of a fixed chain, with no certificate.
+fn fixed_chain(name: &str, states: &[String], matrix: &TransitionMatrix) -> Analysis {
+    Analysis {
+        name: name.to_owned(),
+        chain: Some(chain_view(name, states, matrix)),
+        convergence: convergence(states, matrix),
+        retry: None,
+        certificate: None,
+        parametric: None,
+        notice: None,
+    }
+}
+
+/// The parametric certificate and view of `chain`, with the chain and
+/// convergence of its instance at `point`.
+fn parametric_analysis(
+    chain: &axiom_model::Chain,
+    param_box: &ParamBox<'_>,
+    point: &Point,
+) -> Result<Analysis, PointError> {
+    let matrix = param_box.instance(point)?.matrix();
+    Ok(Analysis {
+        certificate: certificate_view(&chain.states, param_box.certificate()),
+        parametric: Some(param_box.view(chain, point)),
+        ..fixed_chain(&chain.name, &chain.states, &matrix)
+    })
 }
 
 fn chain_view(name: &str, states: &[String], matrix: &TransitionMatrix) -> Chain {
@@ -419,6 +511,24 @@ fn certificate_view(states: &[String], certificate: &Certificate) -> Option<Cert
                     "Its absolute value is below 1, so every start converges to the fixed point. {NOT_CHECKED}"
                 ),
             },
+            Claim::ParametricContraction => {
+                let (a, b) = match certificate.model() {
+                    Model::Parametric { a, b } => {
+                        (parametric::interval_text(a), parametric::interval_text(b))
+                    }
+                    _ => (String::from("?"), String::from("?")),
+                };
+                ClaimView {
+                    id: String::from("parametric-contraction"),
+                    statement: format!(
+                        "For every a in {a} and b in {b}, P({second}) settles to a/(a+b) and |1 - a - b| < 1"
+                    ),
+                    status: UNCHECKED,
+                    detail: format!(
+                        "One claim for the whole range, not for sampled values. {NOT_CHECKED}"
+                    ),
+                }
+            }
             _ => ClaimView {
                 id: format!("claim-{index}"),
                 statement: String::from("A claim of a kind this page cannot show"),
