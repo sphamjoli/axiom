@@ -13,10 +13,12 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${repo_root}/lean"
 
 lake build
-lake env lean \
-  -DwarningAsError=true \
-  -DautoImplicit=false \
-  -DrelaxedAutoImplicit=false \
-  -Dlinter.missingDocs=true \
-  -Dlinter.unusedVariables=true \
-  --run AxiomCheckTest/Main.lean
+for test_file in AxiomCheckTest/Main.lean AxiomCheckTest/Estimate.lean; do
+  lake env lean \
+    -DwarningAsError=true \
+    -DautoImplicit=false \
+    -DrelaxedAutoImplicit=false \
+    -Dlinter.missingDocs=true \
+    -Dlinter.unusedVariables=true \
+    --run "${test_file}"
+done
