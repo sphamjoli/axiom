@@ -7,33 +7,38 @@
 //! longer than a wall-clock limit.
 //!
 //! The Lean project directory decides which checker code runs. It is the
-//! directory named by [`LEAN_DIR_VARIABLE`] when that is set, so whoever
-//! controls the environment controls the checker; otherwise it is the `lean`
-//! directory of the source tree the binary was built from, a path fixed at
-//! compile time. An installed binary whose source tree has moved or been
-//! deleted therefore needs [`LEAN_DIR_VARIABLE`] set.
+//! directory given by `--lean-dir` or [`LEAN_DIR_VARIABLE`], so whoever
+//! controls the command line or the environment controls the checker;
+//! otherwise it is the `lean` directory of the source tree the binary was
+//! built from, a path fixed at compile time. An installed binary whose source
+//! tree has moved or been deleted therefore needs one of them set.
+//!
+//! The checker's `error:` lines are mapped onto fixed codes, and its error
+//! stream is never shown, so the same failure reads the same everywhere.
 
 use std::fmt;
 use std::io::Read;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::{Child, Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use crate::error::CliError;
+use crate::error::{CheckerReason, CliError, FileRole, IoFailure};
 
-/// The environment variable that overrides the Lean project directory, and
-/// with it the checker code that runs.
+/// The environment variable that names the Lean project directory when
+/// `--lean-dir` is not given, and with it the checker code that runs.
 pub const LEAN_DIR_VARIABLE: &str = "AXIOM_LEAN_DIR";
 
-/// The environment variable that overrides the checker's wall-clock limit,
-/// in whole seconds.
+/// The environment variable that sets the checker's wall-clock limit, in
+/// whole seconds, when `--timeout-secs` is not given.
 pub const TIMEOUT_VARIABLE: &str = "AXIOM_CHECK_TIMEOUT_SECS";
 
-/// The checker's wall-clock limit when [`TIMEOUT_VARIABLE`] is unset.
-pub const DEFAULT_TIMEOUT: Duration = Duration::from_mins(1);
+/// The checker's wall-clock limit in seconds when neither `--timeout-secs`
+/// nor [`TIMEOUT_VARIABLE`] sets one.
+pub const DEFAULT_TIMEOUT_SECS: u64 = 60;
 
-/// The Lean project directory used when [`LEAN_DIR_VARIABLE`] is unset.
+/// The Lean project directory used when neither `--lean-dir` nor
+/// [`LEAN_DIR_VARIABLE`] names one.
 const DEFAULT_LEAN_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../lean");
 
 /// The checker entry point, relative to the Lean project directory.
@@ -41,9 +46,6 @@ const CHECKER: &str = "AxiomCheckCli/Main.lean";
 
 /// The most bytes read from each of the checker's output streams.
 pub const MAX_OUTPUT_BYTES: u64 = 64 * 1024;
-
-/// The longest error text from the checker that is shown.
-pub const MAX_ERROR_CHARS: usize = 200;
 
 /// How often the checker is polled for exit while it runs.
 const POLL_INTERVAL: Duration = Duration::from_millis(20);
@@ -99,61 +101,31 @@ impl fmt::Display for Report {
     }
 }
 
-/// The Lean project directory: [`LEAN_DIR_VARIABLE`] if set, otherwise the
-/// `lean` directory of the repository this binary was built from.
-fn lean_dir() -> PathBuf {
-    std::env::var_os(LEAN_DIR_VARIABLE)
-        .map_or_else(|| PathBuf::from(DEFAULT_LEAN_DIR), PathBuf::from)
-}
-
-/// The checker's wall-clock limit: [`TIMEOUT_VARIABLE`] if set, otherwise
-/// [`DEFAULT_TIMEOUT`].
+/// Runs the Lean checker on the certificate at `cert`, from the Lean project
+/// in `lean_dir`, or the source tree's when that is `None`, and kills it
+/// after `limit`.
 ///
 /// # Errors
 ///
-/// Returns [`CliError::Usage`] when the variable is set to anything but a
-/// positive whole number of seconds, so a typo never disables the limit.
-pub fn timeout() -> Result<Duration, CliError> {
-    match std::env::var_os(TIMEOUT_VARIABLE) {
-        None => Ok(DEFAULT_TIMEOUT),
-        Some(value) => value
-            .to_str()
-            .and_then(|text| text.parse::<u64>().ok())
-            .filter(|seconds| *seconds > 0)
-            .map(Duration::from_secs)
-            .ok_or(CliError::Usage(
-                "AXIOM_CHECK_TIMEOUT_SECS must be a positive whole number of seconds",
-            )),
-    }
-}
-
-/// Runs the Lean checker on the certificate at `cert`.
-///
-/// # Errors
-///
-/// Returns [`CliError::Io`] when the certificate path cannot be resolved,
-/// [`CliError::LeanStart`] when `lake` cannot be run, [`CliError::LeanTimeout`]
-/// when the checker runs longer than [`timeout`], and the errors of
-/// [`interpret`] for its output.
-pub fn run(cert: &Path) -> Result<Report, CliError> {
-    let limit = timeout()?;
-    let cert = cert.canonicalize().map_err(|source| CliError::Io {
-        path: cert.to_path_buf(),
-        source,
+/// Returns [`CliError::ReadFailed`] when the certificate path cannot be
+/// resolved, [`CliError::CheckerNotStarted`] when `lake` cannot be run,
+/// [`CliError::CheckerTimeout`] when the checker runs longer than `limit`,
+/// and the errors of [`interpret`] for its output.
+pub fn run(cert: &Path, lean_dir: Option<&Path>, limit: Duration) -> Result<Report, CliError> {
+    let cert = cert.canonicalize().map_err(|error| CliError::ReadFailed {
+        file: FileRole::Certificate,
+        failure: IoFailure::from(&error),
     })?;
-    let dir = lean_dir();
+    let dir = lean_dir.unwrap_or(Path::new(DEFAULT_LEAN_DIR));
     let start = Instant::now();
-    let start_error = |source| CliError::LeanStart {
-        dir: dir.clone(),
-        source,
-    };
+    let start_error = |_: std::io::Error| CliError::CheckerNotStarted;
     let mut command = Command::new("lake");
     #[cfg(unix)]
     std::os::unix::process::CommandExt::process_group(&mut command, 0);
     let mut child = command
         .args(["env", "lean", "--run", CHECKER])
         .arg(&cert)
-        .current_dir(&dir)
+        .current_dir(dir)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -173,13 +145,16 @@ pub fn run(cert: &Path) -> Result<Report, CliError> {
             .and_then(|handle| handle.join().ok())
             .unwrap_or_default()
     };
-    let (stdout, stderr) = (collect(stdout), collect(stderr));
+    let stdout = collect(stdout);
+    // The error stream is drained so the checker never blocks on it, but it
+    // is never shown: it holds paths and messages that vary by machine.
+    drop(collect(stderr));
     let Some(code) = status else {
-        return Err(CliError::LeanTimeout {
+        return Err(CliError::CheckerTimeout {
             seconds: limit.as_secs(),
         });
     };
-    interpret(code, &stdout, &stderr, start.elapsed())
+    interpret(code, &stdout, start.elapsed())
 }
 
 /// Waits for `child` until `limit` after `start`. Returns its exit code, or
@@ -232,58 +207,63 @@ pub fn read_bounded(pipe: impl Read) -> String {
     String::from_utf8_lossy(&bytes).into_owned()
 }
 
+/// What the checker printed: its verdicts and its first error reason.
+struct Output<'a> {
+    verdicts: Vec<Verdict>,
+    error: Option<&'a str>,
+}
+
 /// Turns the checker's exit code and output into a report. Exit code 0 or 1
 /// with at least one verdict and verdicts that agree with the code is a
 /// report; anything else is an error.
 ///
 /// # Errors
 ///
-/// Returns [`CliError::Lean`] for an output line that is neither a verdict
-/// nor an `error:` line, for an exit code that disagrees with the verdicts,
-/// and for any other exit code or no verdicts, with the checker's own error
-/// message or the start of its error stream, at most [`MAX_ERROR_CHARS`]
-/// characters long.
-pub fn interpret(
-    code: i32,
-    stdout: &str,
-    stderr: &str,
-    elapsed: Duration,
-) -> Result<Report, CliError> {
-    let verdicts = parse_output(stdout)?;
-    match code {
-        0 | 1 if !verdicts.is_empty() => {
+/// Returns [`CliError::CheckerUnexpectedOutput`] for a line that is neither
+/// a verdict nor an `error:` line, [`CliError::CheckerStatusMismatch`] for
+/// an exit code that disagrees with the verdicts,
+/// [`CliError::CheckerRefused`] with the mapped reason when there is no
+/// report and the checker printed an `error:` line, and
+/// [`CliError::CheckerNoVerdict`] otherwise.
+pub fn interpret(code: i32, stdout: &str, elapsed: Duration) -> Result<Report, CliError> {
+    let Output { verdicts, error } = parse_output(stdout)?;
+    match (code, error) {
+        (0 | 1, _) if !verdicts.is_empty() => {
             if (code == 0) == verdicts.iter().all(|verdict| verdict.accepted) {
                 Ok(Report { verdicts, elapsed })
             } else {
-                Err(CliError::Lean(
-                    "exit status disagrees with the verdicts".to_owned(),
-                ))
+                Err(CliError::CheckerStatusMismatch)
             }
         }
-        _ => Err(CliError::Lean(failure_text(stdout, stderr))),
+        (_, Some(reason)) => Err(CliError::CheckerRefused(CheckerReason::from_line(reason))),
+        (_, None) => Err(CliError::CheckerNoVerdict),
     }
 }
 
-/// Reads the verdict lines. Lines starting with `error:` are skipped here
-/// and reported by [`failure_text`]; any other line is unexpected.
-fn parse_output(stdout: &str) -> Result<Vec<Verdict>, CliError> {
-    let mut verdicts = Vec::new();
+/// Reads the verdict lines and the first `error:` line; any other line is
+/// unexpected.
+fn parse_output(stdout: &str) -> Result<Output<'_>, CliError> {
+    let mut output = Output {
+        verdicts: Vec::new(),
+        error: None,
+    };
     for line in stdout.lines() {
-        if line.starts_with("error:") {
+        if let Some(reason) = line.strip_prefix("error: ") {
+            output.error = output.error.or(Some(reason));
             continue;
         }
-        let verdict = line
+        let (claim, accepted) = line
             .strip_suffix(": accepted")
             .map(|claim| (claim, true))
             .or_else(|| line.strip_suffix(": rejected").map(|claim| (claim, false)))
             .filter(|(claim, _)| is_claim(claim))
-            .ok_or_else(|| CliError::Lean("unexpected output line".to_owned()))?;
-        verdicts.push(Verdict {
-            claim: verdict.0.to_owned(),
-            accepted: verdict.1,
+            .ok_or(CliError::CheckerUnexpectedOutput)?;
+        output.verdicts.push(Verdict {
+            claim: claim.to_owned(),
+            accepted,
         });
     }
-    Ok(verdicts)
+    Ok(output)
 }
 
 /// Whether `text` has the form `claim <n> Mass row <r>` or `claim <n> <kind>`
@@ -301,15 +281,4 @@ fn is_claim(text: &str) -> bool {
         ] => number(index),
         _ => false,
     }
-}
-
-/// The checker's own error message if it printed one, otherwise a short
-/// excerpt of its error stream.
-fn failure_text(stdout: &str, stderr: &str) -> String {
-    let message = stdout
-        .lines()
-        .find_map(|line| line.strip_prefix("error: "))
-        .or_else(|| stderr.lines().find(|line| !line.trim().is_empty()))
-        .unwrap_or("exited without a verdict");
-    message.chars().take(MAX_ERROR_CHARS).collect()
 }

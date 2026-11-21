@@ -55,8 +55,8 @@ fn lean_malformed_certificate_exits_with_status_two() -> Result<(), TestError> {
     let output = check(&repo_root().join("fixtures/certificates/reject/duplicate-key.json"))?;
     ensure(output.status.code() == Some(2), "expected exit status 2")?;
     ensure(
-        String::from_utf8_lossy(&output.stderr).contains("Lean checker:"),
-        "missing checker error",
+        output.stderr == b"axiom: checker-invalid-certificate: the checker refused the certificate as invalid\n",
+        "missing mapped checker error",
     )
 }
 
@@ -68,15 +68,19 @@ fn lean_device_instead_of_a_file_exits_with_status_two() -> Result<(), TestError
     let output = check(Path::new("/dev/zero"))?;
     ensure(output.status.code() == Some(2), "expected exit status 2")?;
     ensure(
-        String::from_utf8_lossy(&output.stderr).contains("certificate is not a regular file"),
+        String::from_utf8_lossy(&output.stderr).starts_with("axiom: checker-not-regular-file: "),
         "missing regular file error",
     )
 }
 
 #[test]
-fn missing_certificate_exits_with_status_two() -> Result<(), TestError> {
+fn missing_certificate_is_a_read_failure_with_status_three() -> Result<(), TestError> {
     let output = check(&repo_root().join("fixtures/certificates/no-such-file.json"))?;
-    ensure(output.status.code() == Some(2), "expected exit status 2")
+    ensure(output.status.code() == Some(3), "expected exit status 3")?;
+    ensure(
+        output.stderr == b"axiom: read-failed: cannot read the certificate file: not found\n",
+        "missing read failure",
+    )
 }
 
 /// Runs `axiom check` with a `lake` on PATH that sleeps for ten seconds in two
@@ -102,18 +106,18 @@ fn checker_over_its_time_limit_is_killed_with_status_three() -> Result<(), TestE
     let output = check_with_sleeping_lake("timeout", "1")?;
     ensure(output.status.code() == Some(3), "expected exit status 3")?;
     ensure(
-        String::from_utf8_lossy(&output.stderr).contains("killed after the limit of 1 s"),
+        String::from_utf8_lossy(&output.stderr).starts_with("axiom: checker-timeout: "),
         "missing time limit error",
     )
 }
 
 #[test]
-fn invalid_time_limit_is_a_usage_error() -> Result<(), TestError> {
+fn invalid_time_limit_in_the_environment_is_a_usage_error() -> Result<(), TestError> {
     for limit in ["0", "-1", "ten"] {
         let output = check_with_sleeping_lake("bad-timeout", limit)?;
         ensure(
-            output.status.code() == Some(2),
-            format!("{limit}: expected exit status 2"),
+            output.status.code() == Some(64),
+            format!("{limit}: expected exit status 64"),
         )?;
     }
     Ok(())

@@ -3,27 +3,24 @@
 
 use std::time::Duration;
 
-use axiom_cli::check::{MAX_ERROR_CHARS, MAX_OUTPUT_BYTES, interpret, read_bounded};
-use axiom_cli::error::CliError;
+use axiom_cli::check::{MAX_OUTPUT_BYTES, interpret, read_bounded};
+use axiom_cli::error::{CheckerReason, CliError};
 
 const NO_TIME: Duration = Duration::ZERO;
 
-/// The message of a `CliError::Lean`, or `None` for any other outcome.
-fn lean_error(code: i32, stdout: &str, stderr: &str) -> Option<String> {
-    match interpret(code, stdout, stderr, NO_TIME) {
-        Err(CliError::Lean(message)) => Some(message),
-        _ => None,
-    }
+/// The error for the checker output, or `None` for a report.
+fn failure(code: i32, stdout: &str) -> Option<CliError> {
+    interpret(code, stdout, NO_TIME).err()
 }
 
 #[test]
 fn accepts_verdicts_that_agree_with_the_exit_status() -> Result<(), CliError> {
     let all = "claim 0 Mass row 0: accepted\nclaim 1 ConvergenceBound: accepted\n";
-    let report = interpret(0, all, "", NO_TIME)?;
+    let report = interpret(0, all, NO_TIME)?;
     assert!(report.all_accepted());
     assert_eq!(report.claims(), 2);
     let one_rejected = "claim 0 Termination: rejected\n";
-    assert!(!interpret(1, one_rejected, "", NO_TIME)?.all_accepted());
+    assert!(!interpret(1, one_rejected, NO_TIME)?.all_accepted());
     Ok(())
 }
 
@@ -32,7 +29,6 @@ fn prints_each_verdict_and_a_summary() -> Result<(), CliError> {
     let report = interpret(
         1,
         "claim 0 FixedPoint: accepted\nclaim 1 Contraction: rejected\n",
-        "",
         NO_TIME,
     )?;
     assert_eq!(
@@ -44,20 +40,13 @@ fn prints_each_verdict_and_a_summary() -> Result<(), CliError> {
 
 #[test]
 fn rejects_an_exit_status_that_disagrees_with_the_verdicts() {
-    let disagreement = Some("exit status disagrees with the verdicts".to_owned());
-    assert_eq!(
-        lean_error(1, "claim 0 Mass row 0: accepted\n", ""),
-        disagreement
-    );
-    assert_eq!(
-        lean_error(0, "claim 0 Mass row 0: rejected\n", ""),
-        disagreement
-    );
+    let mismatch = Some(CliError::CheckerStatusMismatch);
+    assert_eq!(failure(1, "claim 0 Mass row 0: accepted\n"), mismatch);
+    assert_eq!(failure(0, "claim 0 Mass row 0: rejected\n"), mismatch);
 }
 
 #[test]
 fn rejects_an_unexpected_line() {
-    let unexpected = Some("unexpected output line".to_owned());
     for stdout in [
         "claim 0 Mass row 0: accepted\nhello\n",
         "claim 0 Unknown: accepted\n",
@@ -65,36 +54,29 @@ fn rejects_an_unexpected_line() {
         "claim 0 Mass row: accepted\n",
         "claim 0 Mass row 0: maybe\n",
     ] {
-        assert_eq!(lean_error(0, stdout, ""), unexpected, "{stdout}");
+        assert_eq!(
+            failure(0, stdout),
+            Some(CliError::CheckerUnexpectedOutput),
+            "{stdout}"
+        );
     }
 }
 
 #[test]
-fn rejects_exit_zero_without_verdicts() {
-    assert_eq!(
-        lean_error(0, "", ""),
-        Some("exited without a verdict".to_owned())
-    );
+fn reports_no_verdict_without_verdicts_or_an_error_line() {
+    assert_eq!(failure(0, ""), Some(CliError::CheckerNoVerdict));
+    assert_eq!(failure(2, ""), Some(CliError::CheckerNoVerdict));
 }
 
 #[test]
-fn reports_the_checker_error_line_or_the_error_stream() {
+fn maps_the_first_checker_error_line_and_never_forwards_it() {
     assert_eq!(
-        lean_error(2, "error: certificate is too large\n", "noise"),
-        Some("certificate is too large".to_owned())
+        failure(
+            2,
+            "error: certificate is too large\nerror: certificate is not UTF-8\n"
+        ),
+        Some(CliError::CheckerRefused(CheckerReason::TooLarge))
     );
-    assert_eq!(
-        lean_error(2, "", "\n  \nlake: unknown target\nmore"),
-        Some("lake: unknown target".to_owned())
-    );
-}
-
-#[test]
-fn truncates_long_error_text() {
-    let long = "x".repeat(MAX_ERROR_CHARS + 1);
-    assert_eq!(lean_error(2, "", &long), Some("x".repeat(MAX_ERROR_CHARS)));
-    let exact = "y".repeat(MAX_ERROR_CHARS);
-    assert_eq!(lean_error(2, "", &exact), Some(exact));
 }
 
 #[test]

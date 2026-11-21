@@ -1,67 +1,60 @@
 //! The `axiom` command line.
 //!
-//! `axiom analyse <model.axm> --cert <out.json>` reads a model and, for a
-//! model without parameters, writes a certificate of the strongest claims the
-//! engine can make about it. `axiom check <cert.json>` runs the Lean checker on a
-//! certificate and reports the verdict on each claim.
-//!
-//! Exit status: 0 when the command succeeded and, for `check`, every claim
-//! was accepted; 1 when `check` found a rejected claim; 2 for a usage error,
-//! an unreadable or invalid input, an unsupported model or a checker that
-//! could not be run; 3 when the checker ran longer than its limit.
+//! `axiom analyse <MODEL> --cert <OUT>` reads a model and, for a model
+//! without parameters, writes a certificate of the strongest claims the
+//! engine can make about it. `axiom check <CERT>` runs the Lean checker on a
+//! certificate and reports the verdict on each claim. The exit codes are
+//! those of [`Outcome`], listed by `axiom --help`. Errors are printed as
+//! `axiom: <code>: <message>`, the same bytes on every machine.
 
 use std::process::ExitCode;
 
-use axiom_cli::cli::{self, Command};
-use axiom_cli::error::CliError;
+use axiom_cli::cli::{self, Cli, Command};
+use axiom_cli::outcome::Outcome;
 use axiom_cli::{analyse, check};
-
-/// The exit status when every claim was accepted or the command succeeded.
-const EXIT_OK: u8 = 0;
-/// The exit status when the checker rejected at least one claim.
-const EXIT_REJECTED: u8 = 1;
-/// The exit status for usage and input errors.
-const EXIT_ERROR: u8 = 2;
-/// The exit status when the checker ran longer than its limit.
-const EXIT_TIMEOUT: u8 = 3;
+use clap::Parser;
+use clap::error::ErrorKind;
 
 fn main() -> ExitCode {
-    let arguments: Vec<_> = std::env::args_os().skip(1).collect();
-    match run(&arguments) {
-        Ok(code) => ExitCode::from(code),
+    let outcome = match Cli::try_parse_from(std::env::args_os()) {
+        Ok(cli) => run(cli),
         Err(error) => {
-            eprintln!("error: {error}");
-            if matches!(error, CliError::Usage(_)) {
-                eprintln!("{}", cli::USAGE);
-            }
-            ExitCode::from(if matches!(error, CliError::LeanTimeout { .. }) {
-                EXIT_TIMEOUT
+            // Help and the version are answers; every other parse error gets
+            // fixed words that repeat nothing typed.
+            if matches!(
+                error.kind(),
+                ErrorKind::DisplayHelp | ErrorKind::DisplayVersion
+            ) {
+                let _ = error.print();
+                Outcome::Accepted
             } else {
-                EXIT_ERROR
-            })
+                eprintln!("{}", cli::usage_message(&error));
+                Outcome::Usage
+            }
         }
-    }
+    };
+    ExitCode::from(outcome.exit_code())
 }
 
-fn run(arguments: &[std::ffi::OsString]) -> Result<u8, CliError> {
-    match cli::parse(arguments)? {
-        Command::Help => {
-            println!("{}", cli::USAGE);
-            Ok(EXIT_OK)
-        }
-        Command::Analyse { model, cert } => {
-            let summary = analyse::run(&model, &cert)?;
+fn run(cli: Cli) -> Outcome {
+    let result = match cli.command {
+        Command::Analyse { model, cert } => analyse::run(&model, &cert).map(|summary| {
             println!("{summary}");
-            Ok(EXIT_OK)
-        }
-        Command::Check { cert } => {
-            let report = check::run(&cert)?;
-            print!("{report}");
-            Ok(if report.all_accepted() {
-                EXIT_OK
-            } else {
-                EXIT_REJECTED
+            Outcome::Accepted
+        }),
+        Command::Check { cert, checker } => {
+            check::run(&cert, checker.lean_dir.as_deref(), checker.timeout()).map(|report| {
+                print!("{report}");
+                if report.all_accepted() {
+                    Outcome::Accepted
+                } else {
+                    Outcome::Rejected
+                }
             })
         }
-    }
+    };
+    result.unwrap_or_else(|error| {
+        eprintln!("{}", error.report());
+        error.outcome()
+    })
 }

@@ -1,88 +1,125 @@
-//! Command line parsing.
+//! The command line, parsed by clap. Each command's arguments are typed
+//! here. A parse error is a usage error, exit code
+//! [`Outcome::Usage`](crate::outcome::Outcome::Usage), and its message never
+//! repeats what was typed.
 
-use std::ffi::OsString;
 use std::path::PathBuf;
+use std::time::Duration;
 
-use crate::error::CliError;
+use clap::{Args, Parser, Subcommand};
 
-/// The usage text printed by `axiom help` and after a usage error.
-pub const USAGE: &str = "usage:
-  axiom analyse <model.axm> --cert <out.json>
-  axiom check <cert.json>
-  axiom help
+use crate::check::{DEFAULT_TIMEOUT_SECS, LEAN_DIR_VARIABLE, TIMEOUT_VARIABLE};
+use crate::outcome::Outcome;
 
-exit status: 0 success or every claim accepted, 1 some claim rejected,
-2 usage or input error, 3 checker killed after its time limit
+/// Writes certificates for models and checks them with the Lean checker.
+#[derive(Debug, Parser)]
+#[command(
+    name = "axiom",
+    version,
+    disable_help_subcommand = true,
+    after_help = exit_codes()
+)]
+pub struct Cli {
+    /// The command to run.
+    #[command(subcommand)]
+    pub command: Command,
+}
 
-environment:
-  AXIOM_LEAN_DIR            Lean project whose checker code runs; defaults to
-                            the source tree the binary was built from
-  AXIOM_CHECK_TIMEOUT_SECS  checker wall-clock limit in seconds (default 60)";
-
-/// A parsed command.
-#[derive(Debug, PartialEq, Eq)]
+/// A command.
+#[derive(Debug, Subcommand)]
 pub enum Command {
-    /// Print the usage text.
-    Help,
-    /// Write a certificate for a model.
+    /// Read a model and, for a model without parameters, write a certificate
+    /// of the strongest claims the engine can make about it.
     Analyse {
         /// The model file to read.
+        #[arg(value_name = "MODEL")]
         model: PathBuf,
         /// The certificate file to write.
+        #[arg(long, value_name = "OUT")]
         cert: PathBuf,
     },
-    /// Check a certificate with the Lean checker.
+    /// Run the Lean checker on a certificate and print the verdict on each
+    /// claim.
     Check {
         /// The certificate file to check.
+        #[arg(value_name = "CERT")]
         cert: PathBuf,
+        /// Where and how long the checker runs.
+        #[command(flatten)]
+        checker: CheckerArgs,
     },
 }
 
-/// Parses the arguments that follow the program name.
-///
-/// # Errors
-///
-/// Returns [`CliError::Usage`] when the arguments do not form a command.
-pub fn parse(arguments: &[OsString]) -> Result<Command, CliError> {
-    let Some((command, rest)) = arguments.split_first() else {
-        return Err(CliError::Usage("missing command"));
-    };
-    match command.to_str() {
-        Some("help" | "--help" | "-h") if rest.is_empty() => Ok(Command::Help),
-        Some("analyse") => parse_analyse(rest),
-        Some("check") => match rest {
-            [cert] if !is_flag(cert) => Ok(Command::Check {
-                cert: PathBuf::from(cert),
-            }),
-            _ => Err(CliError::Usage("check takes exactly one certificate path")),
-        },
-        _ => Err(CliError::Usage("unknown command")),
+/// Where the Lean checker runs from and how long it may run.
+#[derive(Debug, Args)]
+pub struct CheckerArgs {
+    /// The Lean project whose checker code runs; defaults to the `lean`
+    /// directory of the source tree the binary was built from.
+    #[arg(long, value_name = "DIR", env = LEAN_DIR_VARIABLE, hide_env_values = true)]
+    pub lean_dir: Option<PathBuf>,
+    /// The checker's wall-clock limit in whole seconds, at least 1.
+    #[arg(
+        long,
+        value_name = "SECONDS",
+        env = TIMEOUT_VARIABLE,
+        hide_env_values = true,
+        default_value_t = DEFAULT_TIMEOUT_SECS,
+        value_parser = clap::value_parser!(u64).range(1..)
+    )]
+    pub timeout_secs: u64,
+}
+
+impl CheckerArgs {
+    /// The checker's wall-clock limit.
+    #[must_use]
+    pub const fn timeout(&self) -> Duration {
+        Duration::from_secs(self.timeout_secs)
     }
 }
 
-fn parse_analyse(rest: &[OsString]) -> Result<Command, CliError> {
-    let mut model = None;
-    let mut cert = None;
-    let mut items = rest.iter();
-    while let Some(item) = items.next() {
-        if item.to_str() == Some("--cert") {
-            let value = items.next().ok_or(CliError::Usage("--cert needs a path"))?;
-            if cert.replace(PathBuf::from(value)).is_some() {
-                return Err(CliError::Usage("--cert given more than once"));
-            }
-        } else if is_flag(item) {
-            return Err(CliError::Usage("unknown option"));
-        } else if model.replace(PathBuf::from(item)).is_some() {
-            return Err(CliError::Usage("analyse takes exactly one model path"));
+/// The exit codes, generated from [`Outcome`] so the help cannot drift from
+/// the codes the program returns.
+#[must_use]
+pub fn exit_codes() -> String {
+    let codes: Vec<String> = Outcome::ALL
+        .iter()
+        .map(|outcome| format!("  {:<3} {}", outcome.exit_code(), outcome.label()))
+        .collect();
+    format!("Exit codes:\n{}", codes.join("\n"))
+}
+
+/// The fixed message for a parse error that is not a request for help or
+/// the version. Unknown arguments, commands and invalid values are what was
+/// typed, so they are never named; an option the program defines may be.
+#[must_use]
+pub fn usage_message(error: &clap::Error) -> String {
+    use clap::error::{ContextKind, ContextValue, ErrorKind};
+    let what = match error.kind() {
+        ErrorKind::InvalidValue | ErrorKind::ValueValidation => "invalid value",
+        ErrorKind::UnknownArgument => "unknown argument",
+        ErrorKind::InvalidSubcommand => "unknown command",
+        ErrorKind::MissingRequiredArgument => "missing required argument",
+        ErrorKind::MissingSubcommand | ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand => {
+            "missing command"
         }
+        ErrorKind::ArgumentConflict => "conflicting arguments",
+        ErrorKind::TooManyValues | ErrorKind::WrongNumberOfValues | ErrorKind::TooFewValues => {
+            "wrong number of values"
+        }
+        ErrorKind::InvalidUtf8 => "an argument is not valid UTF-8",
+        _ => "invalid command line",
+    };
+    let named = !matches!(
+        error.kind(),
+        ErrorKind::UnknownArgument | ErrorKind::InvalidSubcommand | ErrorKind::InvalidUtf8
+    );
+    let flag = match error.get(ContextKind::InvalidArg) {
+        Some(ContextValue::String(flag)) if named => Some(flag.clone()),
+        Some(ContextValue::Strings(flags)) if named => Some(flags.join(", ")),
+        _ => None,
+    };
+    match flag {
+        Some(flag) => format!("axiom: usage: {what}: {flag}; see `axiom --help`"),
+        None => format!("axiom: usage: {what}; see `axiom --help`"),
     }
-    match (model, cert) {
-        (Some(model), Some(cert)) => Ok(Command::Analyse { model, cert }),
-        (None, _) => Err(CliError::Usage("analyse needs a model path")),
-        (_, None) => Err(CliError::Usage("analyse needs --cert <out.json>")),
-    }
-}
-
-fn is_flag(item: &OsString) -> bool {
-    item.to_str().is_some_and(|text| text.starts_with('-'))
 }
