@@ -12,6 +12,10 @@ pub enum TwoStateChainError {
     /// distribution is a fixed point.
     #[error("chain never leaves either state, so it has no unique fixed point")]
     NoUniqueFixedPoint,
+    /// Both exit probabilities are one, so the chain alternates between the
+    /// states forever and the update, with factor `-1`, is not a contraction.
+    #[error("chain alternates between its states, so its update is not a contraction")]
+    NotContracting,
 }
 
 /// A chain with two states that moves between them at fixed probabilities.
