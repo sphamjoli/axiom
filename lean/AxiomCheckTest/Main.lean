@@ -5,9 +5,8 @@ import AxiomCheck
 
 Runs the strict JSON reader and the certificate reader against the shared
 fixtures in `fixtures/certificates/` and against reader-specific cases. Every
-rejection fixture must be rejected, except the one whose fault is arithmetic:
-the reader accepts it structurally and the claim check
-rejects it. Exits with a non-zero status if any case fails.
+rejection fixture must be rejected, except those whose fault is arithmetic:
+the reader accepts them structurally and the claim check rejects them. Exits with a non-zero status if any case fails.
 -/
 
 open AxiomCheck
@@ -19,7 +18,9 @@ def fixtureDirectory : System.FilePath := ".." / "fixtures" / "certificates"
 
 /-- Rejection fixtures whose fault is checked by the claim checker, not the
 reader. -/
-def arithmeticFixtures : List String := ["does-not-sum-to-one.json"]
+def arithmeticFixtures : List String :=
+  [ "does-not-sum-to-one.json", "wrong-fixed-point.json", "wrong-contraction-factor.json"
+  , "contraction-factor-one.json", "periodic-contraction.json" ]
 
 /-- The outcome of one test case: its name and, on failure, why. -/
 structure Outcome where
@@ -90,6 +91,12 @@ def readerCases : List Outcome :=
       "accepted 21 digits"
   ]
 
+/-- Whether `text` parses and every claim checks. -/
+def checks (text : String) : Option Bool :=
+  match Parse.certificate text with
+  | .ok certificate => some (Check.check certificate)
+  | .error _ => none
+
 /-- Whether reading `text` as a certificate succeeds. -/
 def certificateAccepts (text : String) : Bool :=
   match Parse.certificate text with
@@ -106,7 +113,15 @@ def goldenCases : IO (List Outcome) := do
            certificate.rows == [[⟨9, 10⟩, ⟨1, 10⟩], [⟨3, 10⟩, ⟨7, 10⟩]] &&
            certificate.claims == [.mass 0, .mass 1]
          | .error _ => false)
-        "golden file was not read as the link model" ]
+        "golden file was not read as the link model"
+    , expect "reads the version 2 golden file as the link model with its two-state claims"
+        (match Parse.certificate (← IO.FS.readFile (fixtureDirectory / "links-fixed-point.json")) with
+         | .ok certificate =>
+           certificate.rows == [[⟨9, 10⟩, ⟨1, 10⟩], [⟨3, 10⟩, ⟨7, 10⟩]] &&
+           certificate.claims ==
+             [.mass 0, .mass 1, .fixedPoint ⟨1, 4⟩, .contraction ⟨false, 3, 5⟩]
+         | .error _ => false)
+        "version 2 golden file was not read as the link model" ]
 
 /-- One case per rejection fixture. -/
 def rejectionCases : IO (List Outcome) := do
@@ -116,7 +131,8 @@ def rejectionCases : IO (List Outcome) := do
     let text ← IO.FS.readFile (fixtureDirectory / "reject" / name)
     let accepted := certificateAccepts text
     if arithmeticFixtures.contains name then
-      pure (expect s!"reader accepts {name} structurally" accepted "rejected an arithmetic fixture")
+      pure (expect s!"reader accepts {name} structurally and the check rejects it"
+        (checks text == some false) "arithmetic fixture was not parsed and rejected")
     else
       pure (expect s!"rejects {name}" (!accepted) "accepted a rejection fixture")
 
@@ -126,17 +142,52 @@ def acceptanceCases : IO (List Outcome) := do
   let names : List String := (entries.map (·.fileName)).toList.mergeSort (· ≤ ·)
   names.mapM fun (name : String) => do
     let text ← IO.FS.readFile (fixtureDirectory / "accept" / name)
-    pure (expect s!"accepts {name}" (certificateAccepts text) "rejected an acceptance fixture")
+    pure (expect s!"accepts and checks {name}" (checks text == some true)
+      "rejected an acceptance fixture")
 
-/-- Whether `text` parses and every claim checks. -/
-def checks (text : String) : Option Bool :=
-  match Parse.certificate text with
-  | .ok certificate => some (Check.check certificate)
-  | .error _ => none
 
 /-- The golden certificate with row 0 replaced by `row`. -/
 def goldenWithRow0 (row : List Fraction) : Certificate :=
   ⟨[row, [⟨3, 10⟩, ⟨7, 10⟩]], [.mass 0, .mass 1]⟩
+
+/-- The link model's rows. -/
+def linkRows : List (List Fraction) := [[⟨9, 10⟩, ⟨1, 10⟩], [⟨3, 10⟩, ⟨7, 10⟩]]
+
+/-- The periodic chain `a = b = 1`, which alternates between its states. -/
+def periodicRows : List (List Fraction) := [[⟨0, 1⟩, ⟨1, 1⟩], [⟨1, 1⟩, ⟨0, 1⟩]]
+
+/-- The chain `a = b = 0`, which never moves. -/
+def identityRows : List (List Fraction) := [[⟨1, 1⟩, ⟨0, 1⟩], [⟨0, 1⟩, ⟨1, 1⟩]]
+
+/-- Cases for the fixed point and contraction checks. -/
+def twoStateCases : IO (List Outcome) := do
+  let golden ← IO.FS.readFile (fixtureDirectory / "links-fixed-point.json")
+  pure
+    [ expect "checks the version 2 golden file" (checks golden == some true)
+        "version 2 golden file did not check"
+    , expect "still checks the version 1 golden file"
+        (checks (← IO.FS.readFile (fixtureDirectory / "links-mass.json")) == some true)
+        "version 1 golden file did not check"
+    , expect "accepts steady state 1/4" (Check.check ⟨linkRows, [.fixedPoint ⟨1, 4⟩]⟩)
+        "rejected 1/4"
+    , expect "rejects claimed steady state 3/10"
+        (!Check.check ⟨linkRows, [.fixedPoint ⟨3, 10⟩]⟩) "accepted 3/10"
+    , expect "accepts factor 3/5" (Check.check ⟨linkRows, [.contraction ⟨false, 3, 5⟩]⟩)
+        "rejected 3/5"
+    , expect "rejects factor -3/5" (!Check.check ⟨linkRows, [.contraction ⟨true, 3, 5⟩]⟩)
+        "accepted -3/5"
+    , expect "rejects factor 1, which is not below one"
+        (!Check.check ⟨identityRows, [.contraction ⟨false, 1, 1⟩]⟩) "accepted factor 1"
+    , expect "rejects the periodic chain's factor -1"
+        (!Check.check ⟨periodicRows, [.contraction ⟨true, 1, 1⟩]⟩) "accepted factor -1"
+    , expect "accepts the periodic chain's steady state 1/2"
+        (Check.check ⟨periodicRows, [.fixedPoint ⟨1, 2⟩]⟩) "rejected 1/2"
+    , expect "rejects a two-state claim about a one-state model"
+        (!Check.check ⟨[[⟨1, 1⟩]], [.fixedPoint ⟨1, 1⟩]⟩) "accepted a one-state model"
+    , expect "rejects a version 2 claim kind in version 1"
+        (!certificateAccepts
+          ((golden.replace "\"version\": 2" "\"version\": 1")))
+        "accepted FixedPoint in version 1" ]
 
 /-- Cases for the claim checker. -/
 def checkCases : IO (List Outcome) := do
@@ -193,7 +244,7 @@ open AxiomCheckTest in
 /-- Runs every case, prints failures, and returns 1 if any failed. -/
 def main : IO UInt32 := do
   let outcomes :=
-    readerCases ++ (← goldenCases) ++ (← checkCases) ++ (← acceptanceCases) ++ (← rejectionCases) ++ limitCases
+    readerCases ++ (← goldenCases) ++ (← checkCases) ++ (← twoStateCases) ++ (← acceptanceCases) ++ (← rejectionCases) ++ limitCases
   let failures := outcomes.filterMap fun outcome => outcome.failure.map (outcome.name, ·)
   for (name, why) in failures do
     IO.eprintln s!"FAIL {name}: {why}"
