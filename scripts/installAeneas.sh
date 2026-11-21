@@ -63,5 +63,5 @@ if ! "${aeneas_dir}/charon" version | grep -q "(${charon_commit})"; then
   exit 1
 fi
 
-rustup toolchain install "${rust_nightly}" --profile minimal \
+rustup toolchain install "${rust_nightly}" --no-self-update --profile minimal \
   --component rustc-dev,llvm-tools,rust-src
