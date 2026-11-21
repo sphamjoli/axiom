@@ -30,5 +30,5 @@
 - [ ] `make check` passes locally (see `CONTRIBUTING.md`)
 - [ ] Every new claim kind the engine emits has a Lean checker and an adversarial certificate that the checker rejects
 - [ ] No `sorry`, `admit`, new `axiom`, or `native_decide` in `lean/`
-- [ ] Trusted computing base changes (if any) are stated and labelled `tcb`
-- [ ] No secrets, local planning notes, or build artifacts committed
+- [ ] Any trusted computing base change is stated and labelled `tcb`
+- [ ] No secrets, local planning notes, or build output committed

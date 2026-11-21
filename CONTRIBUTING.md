@@ -1,10 +1,10 @@
 # Contributing to axiom
 
-This guide covers everything needed to build, check and change the repository: the tools to install, the commands to run, the layout of the code, and the rules for commits and pull requests. The project itself is described in [README.md](README.md). It is a proof of concept.
+This guide describes how to build, check and change the repository: the tools to install, the commands to run, the layout of the code, and the rules for commits and pull requests. The project itself is described in [README.md](README.md). It is a proof of concept.
 
 ## Prerequisites
 
-Three tools must be installed before any command below will work.
+The commands below require three tools.
 
 | Tool | Purpose |
 | --- | --- |
