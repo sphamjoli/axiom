@@ -4,8 +4,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
-    "typecheck": "vue-tsc --noEmit",
+    "wasm": "cargo build --manifest-path ../Cargo.toml -p axiom-wasm --release --locked --target wasm32-unknown-unknown && wasm-bindgen --target web --out-dir src/engine/wasm ../target/wasm32-unknown-unknown/release/axiom_wasm.wasm",
+    "build": "bun run wasm && vite build",
+    "typecheck": "bun run wasm && vue-tsc --noEmit",
     "preview": "vite preview"
   },
   "dependencies": {

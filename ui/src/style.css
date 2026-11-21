@@ -17,6 +17,7 @@
   --proven: #0f6e5a;
   --estimated: #8a5d00;
   --rejected: #b3261e;
+  --unchecked: #4b5a78;
   --ease-out-snap: cubic-bezier(0.23, 1, 0.32, 1);
 }
 
@@ -30,6 +31,7 @@
   --proven: #5cc7a9;
   --estimated: #e3b341;
   --rejected: #f2857d;
+  --unchecked: #a9b6d3;
 }
 
 @theme inline {
@@ -45,6 +47,7 @@
   --color-proven: var(--proven);
   --color-estimated: var(--estimated);
   --color-rejected: var(--rejected);
+  --color-unchecked: var(--unchecked);
 }
 
 @layer components {

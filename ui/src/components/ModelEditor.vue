@@ -16,8 +16,8 @@ defineProps<{ diagnostics: Diagnostic[] }>();
       class="w-full flex-1 resize-y rounded border border-rule bg-paper p-3 font-mono text-sm leading-6 text-ink"
     />
     <ul v-if="diagnostics.length > 0" class="mt-3 space-y-1 text-sm text-rejected" role="alert">
-      <li v-for="(d, i) in diagnostics" :key="i">Line {{ d.line }}: {{ d.message }}</li>
+      <li v-for="(d, i) in diagnostics" :key="i">Line {{ d.line }}, column {{ d.column }}: {{ d.message }}</li>
     </ul>
-    <p v-else class="mt-3 text-sm text-ink-muted">Edit the chain and the results below recompute.</p>
+    <p v-else class="mt-3 text-sm text-ink-muted">Edit the model and the results below recompute.</p>
   </section>
 </template>

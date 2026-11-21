@@ -46,13 +46,13 @@ const view = computed(() => {
       </g>
       <text :x="M.l - 8" :y="view.y(1) + 4" text-anchor="end" class="fill-ink-muted font-mono text-[11px]">1</text>
       <text :x="M.l - 8" :y="view.y(0) + 4" text-anchor="end" class="fill-ink-muted font-mono text-[11px]">0</text>
-      <rect :x="M.l" :width="W - M.l - M.r" :y="view.bandTop" :height="view.bandBottom - view.bandTop" class="fill-proven/20" />
-      <line :x1="M.l" :x2="W - M.r" :y1="view.y(view.fixed)" :y2="view.y(view.fixed)" stroke-dasharray="4 4" class="stroke-proven" />
-      <text :x="M.l - 8" :y="view.y(view.fixed) + 4" text-anchor="end" class="fill-proven font-mono text-[11px]">{{ data.fixedPoint.num }}/{{ data.fixedPoint.den }}</text>
-      <text :x="W - M.r" :y="view.bandTop - 5" text-anchor="end" class="fill-proven font-mono text-[11px]">band {{ data.fixedPoint.num }}/{{ data.fixedPoint.den }} &#177; {{ data.epsilon.num }}/{{ data.epsilon.den }}</text>
+      <rect :x="M.l" :width="W - M.l - M.r" :y="view.bandTop" :height="view.bandBottom - view.bandTop" class="fill-signal/15" />
+      <line :x1="M.l" :x2="W - M.r" :y1="view.y(view.fixed)" :y2="view.y(view.fixed)" stroke-dasharray="4 4" class="stroke-ink-muted" />
+      <text :x="M.l - 8" :y="view.y(view.fixed) + 4" text-anchor="end" class="fill-ink-muted font-mono text-[11px]">{{ data.fixedPoint.num }}/{{ data.fixedPoint.den }}</text>
+      <text :x="W - M.r" :y="view.bandTop - 5" text-anchor="end" class="fill-ink-muted font-mono text-[11px]">band {{ data.fixedPoint.num }}/{{ data.fixedPoint.den }} &#177; {{ data.epsilon.num }}/{{ data.epsilon.den }}</text>
       <text :x="(M.l + W - M.r) / 2" :y="H - 6" text-anchor="middle" class="fill-ink-muted text-[12px]">step t</text>
       <text :x="14" :y="(M.t + H - M.b) / 2" text-anchor="middle" :transform="`rotate(-90 14 ${(M.t + H - M.b) / 2})`" class="fill-ink-muted text-[12px]">P({{ data.state }}) at step t</text>
-      <g v-if="data.horizon >= 0">
+      <g v-if="data.horizon !== null">
         <line :x1="view.x(data.horizon)" :x2="view.x(data.horizon)" :y1="M.t" :y2="H - M.b" stroke-dasharray="3 3" class="stroke-ink-muted" />
         <text :x="view.x(data.horizon) + 6" :y="M.t + 12" class="fill-ink font-mono text-[12px]" :text-anchor="view.x(data.horizon) > W * 0.6 ? 'end' : 'start'" :dx="view.x(data.horizon) > W * 0.6 ? -12 : 0">t = {{ data.horizon }}, within 1/1000 from here</text>
       </g>
@@ -61,7 +61,10 @@ const view = computed(() => {
         <title>t = {{ p.t }}: {{ p.value.num }}/{{ p.value.den }}</title>
       </circle>
     </svg></div>
-    <p class="mt-2 text-sm text-ink-muted">
+    <p v-if="data.horizon === null" class="mt-2 text-sm text-ink-muted">
+      Not yet within <Frac :value="data.epsilon" /> of <Frac :value="data.fixedPoint" /> after {{ view.tMax }} steps.
+    </p>
+    <p v-else class="mt-2 text-sm text-ink-muted">
       Within <Frac :value="data.epsilon" /> of <Frac :value="data.fixedPoint" /> for every t &ge; {{ data.horizon }} (shaded band, widened for visibility).
     </p>
   </section>

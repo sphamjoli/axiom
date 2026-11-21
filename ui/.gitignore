@@ -1,3 +1,4 @@
 node_modules/
 dist/
 *.tsbuildinfo
+src/engine/wasm/

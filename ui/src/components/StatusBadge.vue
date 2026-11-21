@@ -4,11 +4,13 @@ import type { ClaimStatus } from "../engine/types";
 defineProps<{ status: ClaimStatus }>();
 
 // Proven is a solid filled tag; Estimated is a dashed outline with no fill and
-// a different glyph, so the two differ in shape as well as colour.
+// a different glyph, so the two differ in shape as well as colour. Unchecked, a claim the engine
+// computed but the checker has not verified, is a dotted neutral outline.
 const styles: Record<ClaimStatus, { label: string; glyph: string; cls: string }> = {
   proven: { label: "Proven", glyph: "∎", cls: "border-proven bg-proven text-sheet" },
   estimated: { label: "Estimated", glyph: "≈", cls: "border-dashed border-estimated text-estimated" },
   rejected: { label: "Rejected", glyph: "✗", cls: "border-rejected text-rejected" },
+  unchecked: { label: "Unchecked", glyph: "?", cls: "border-dotted border-unchecked text-unchecked" },
 };
 </script>
 
