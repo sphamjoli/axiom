@@ -208,6 +208,25 @@ def checkCases : IO (List Outcome) := do
     , expect "accepts the unmutated golden model"
         (Check.check (goldenWithRow0 [⟨9, 10⟩, ⟨1, 10⟩])) "rejected the golden model" ]
 
+/-- Evaluation cases for the semantics the theorems are about: the link model
+`a = 1/10`, `b = 3/10` and a retry loop with `p = 3/10`. -/
+def semanticsCases : List Outcome :=
+  let link : Semantics.TwoState := ⟨1 / 10, 3 / 10⟩
+  let retry : Semantics.Retry := ⟨3 / 10⟩
+  [ expect "link factor is 3/5" (link.lam == 3 / 5) s!"factor {link.lam}"
+  , expect "link steady state is 1/4" (link.fixedPoint == 1 / 4) s!"steady state {link.fixedPoint}"
+  , expect "certifies the bound 1/1000 after 13 steps from 1"
+      (decide (Semantics.ConvergenceBoundCertified link 1 13 (1 / 1000))) "did not certify 13 steps"
+  , expect "does not certify the bound 1/1000 after 12 steps from 1"
+      (!decide (Semantics.ConvergenceBoundCertified link 1 12 (1 / 1000))) "certified 12 steps"
+  , expect "retry expects 10/3 attempts" (retry.expectedAttempts == 10 / 3)
+      s!"expected {retry.expectedAttempts}"
+  , expect "retry fails 20 times with probability (7/10)^20"
+      (retry.failureAfter 20 == 79792266297612001 / 100000000000000000000 &&
+        Semantics.ratPow (7 / 10) 20 == 79792266297612001 / 100000000000000000000)
+      s!"failure probability {retry.failureAfter 20}"
+  ]
+
 /-- Cases for size and shape limits that are impractical as fixture files. -/
 def limitCases : List Outcome :=
   let half := "{\"num\":\"1\",\"den\":\"2\"}"
@@ -244,7 +263,7 @@ open AxiomCheckTest in
 /-- Runs every case, prints failures, and returns 1 if any failed. -/
 def main : IO UInt32 := do
   let outcomes :=
-    readerCases ++ (← goldenCases) ++ (← checkCases) ++ (← twoStateCases) ++ (← acceptanceCases) ++ (← rejectionCases) ++ limitCases
+    readerCases ++ (← goldenCases) ++ (← checkCases) ++ (← twoStateCases) ++ (← acceptanceCases) ++ (← rejectionCases) ++ semanticsCases ++ limitCases
   let failures := outcomes.filterMap fun outcome => outcome.failure.map (outcome.name, ·)
   for (name, why) in failures do
     IO.eprintln s!"FAIL {name}: {why}"
