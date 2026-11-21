@@ -1,4 +1,4 @@
-//! Reading certificates: every rule of the version 1 format is enforced.
+//! Reading certificates: every rule of the version 1 and 2 formats is enforced.
 
 mod common;
 
@@ -118,8 +118,8 @@ fn rejects_an_unrelated_format() {
 }
 
 #[test]
-fn rejects_versions_other_than_one() {
-    for version in ["0", "2"] {
+fn rejects_versions_other_than_one_and_two() {
+    for version in ["0", "3"] {
         let text = certificate_text(halves(), 0)
             .replace("\"version\":1", &format!("\"version\":{version}"));
         assert!(matches!(
@@ -151,7 +151,7 @@ fn rejects_unknown_fields_at_every_level() {
 
 #[test]
 fn rejects_unknown_claim_kinds_and_missing_fields() {
-    let unknown = certificate_text(halves(), 0).replace("\"Mass\"", "\"FixedPoint\"");
+    let unknown = certificate_text(halves(), 0).replace("\"Mass\"", "\"Unknown\"");
     assert!(matches!(
         Certificate::from_json(&unknown),
         Err(CertificateError::Json { .. })
@@ -322,8 +322,8 @@ fn every_error_names_what_went_wrong() {
         "claim 1 repeats claim 0"
     );
     assert_eq!(
-        CertificateError::UnsupportedVersion(2).to_string(),
-        "unsupported certificate version 2"
+        CertificateError::UnsupportedVersion(3).to_string(),
+        "unsupported certificate version 3"
     );
 }
 
