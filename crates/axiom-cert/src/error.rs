@@ -166,6 +166,39 @@ pub enum CertificateError {
     },
 }
 
+impl CertificateError {
+    /// A stable kebab-case name for the error, the same on every machine.
+    #[must_use]
+    pub const fn code(&self) -> &'static str {
+        match self {
+            Self::TooLarge { .. } => "certificate-too-large",
+            Self::Json { .. } => "invalid-json",
+            Self::JsonLimit => "json-limit",
+            Self::UnsupportedFormat => "unsupported-format",
+            Self::UnsupportedVersion(_) => "unsupported-version",
+            Self::TooManyStates { .. } => "too-many-states",
+            Self::NonCanonicalFraction { .. } => "non-canonical-fraction",
+            Self::Probability { .. } => "entry-not-probability",
+            Self::TransitionRow { .. } => "invalid-row",
+            Self::TransitionMatrix(_) => "invalid-matrix",
+            Self::NoClaims => "no-claims",
+            Self::DuplicateClaim { .. } => "duplicate-claim",
+            Self::InvalidClaimFraction { .. } => "invalid-claim-fraction",
+            Self::ClaimNeedsVersion { .. } => "claim-needs-version",
+            Self::FalseClaim { .. } => "false-claim",
+            Self::NotTwoState { .. } => "not-two-state",
+            Self::ModelForm => "model-form",
+            Self::ModelNeedsVersion { .. } => "model-needs-version",
+            Self::InvalidRetrySuccess => "invalid-retry-success",
+            Self::NotChain { .. } => "not-chain",
+            Self::NotRetry { .. } => "not-retry",
+            Self::CountOutOfRange { .. } => "count-out-of-range",
+            Self::NoConvergenceBound(_) => "no-convergence-bound",
+            Self::RowOutOfRange { .. } => "row-out-of-range",
+        }
+    }
+}
+
 impl From<serde_json::Error> for CertificateError {
     /// Keeps only the position of a JSON error. `serde_json` messages quote
     /// unknown field and variant names from the input, so the message itself
@@ -189,4 +222,16 @@ pub enum ConvergenceBoundError {
     /// number of steps.
     #[error("tolerance is not reached within the step limit")]
     NotReached,
+}
+
+impl ConvergenceBoundError {
+    /// A stable kebab-case name for the error, the same on every machine:
+    /// the chain's own code, or `tolerance-not-reached`.
+    #[must_use]
+    pub const fn code(&self) -> &'static str {
+        match self {
+            Self::Chain(error) => error.code(),
+            Self::NotReached => "tolerance-not-reached",
+        }
+    }
 }

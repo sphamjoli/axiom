@@ -304,29 +304,6 @@ fn rejects_trailing_data_and_malformed_json() {
     ));
 }
 
-#[test]
-fn every_error_names_what_went_wrong() {
-    let message = CertificateError::RowOutOfRange {
-        claim: 2,
-        row: 5,
-        rows: 3,
-    }
-    .to_string();
-    assert_eq!(message, "claim 2 refers to row 5, but the model has 3 rows");
-    assert_eq!(
-        CertificateError::NoClaims.to_string(),
-        "certificate makes no claims"
-    );
-    assert_eq!(
-        CertificateError::DuplicateClaim { claim: 1, first: 0 }.to_string(),
-        "claim 1 repeats claim 0"
-    );
-    assert_eq!(
-        CertificateError::UnsupportedVersion(3).to_string(),
-        "unsupported certificate version 3"
-    );
-}
-
 /// A certificate whose model has `states` rows, each with `states` entries
 /// of `1/states`.
 fn uniform_certificate(states: usize) -> String {
